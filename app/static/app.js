@@ -583,9 +583,20 @@ function blobToMedia(blob, name, max = 1600) {
     img.src = url;
   });
 }
-const fileToMedia = (file, max) => file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|svg)$/i.test(file.name)
-  ? blobToMedia(file, file.name || 'wklejony obraz.png', max)
-  : Promise.reject(new Error(`${file.name}: obsługiwane są obrazy (PNG, JPG, WEBP, SVG). Wideo dodaj jako link.`));
+// Nie ufamy samemu rozszerzeniu ani typowi z systemu (Windows zapisuje JPG jako .jfif, czasem bez typu) –
+// próbujemy odczytać każdy plik, a odrzucamy dopiero ten, którego przeglądarka naprawdę nie otworzy.
+function fileToMedia(file, max) {
+  if (/^(video|audio)\//.test(file.type) || /\.(mp4|mov|avi|webm|mp3|wav|pdf|docx?|xlsx?|zip)$/i.test(file.name)) {
+    return Promise.reject(new Error(`${file.name}: to nie jest obraz. Wideo i dokumenty dodaj jako link.`));
+  }
+  let blob = file;
+  if (!file.type || file.type === 'application/octet-stream') {
+    const ext = (file.name.match(/\.(\w+)$/) || [])[1]?.toLowerCase();
+    const guess = { svg: 'image/svg+xml', png: 'image/png', gif: 'image/gif', webp: 'image/webp', avif: 'image/avif' }[ext] || 'image/jpeg';
+    blob = new File([file], file.name, { type: guess });  // SVG bez typu nie wyświetli się w <img>
+  }
+  return blobToMedia(blob, file.name || 'wklejony obraz.png', max);
+}
 // logo / avatar klienta: kwadratowa, ostra miniatura z zachowaną przezroczystością
 async function setClientAvatar(c, file) {
   if (!file) return;
@@ -1429,7 +1440,7 @@ document.addEventListener('click', async e => {
     case 'del-client': { const c = clientById(id); if (!confirm(`Usunąć klienta „${c.name}” i wszystkie jego treści (${postsOf(id).length})? Tej operacji nie można cofnąć.`)) return;
       state.posts = state.posts.filter(p => p.clientId !== id); state.clients = state.clients.filter(x => x.id !== id);
       Object.keys(state.months).forEach(k => { if (k.startsWith(id + '|')) delete state.months[k]; }); save(true); location.hash = '#/'; break; }
-    case 'client-avatar': { const c = clientById(r.id); const [f] = await pickFiles('image/*,.svg', false); setClientAvatar(c, f); break; }
+    case 'client-avatar': { const c = clientById(r.id); const [f] = await pickFiles('image/*,.svg,.jfif,.webp,.avif', false); setClientAvatar(c, f); break; }
     case 'client-avatar-rm': { const c = clientById(r.id); c.avatar = ''; save(true); render(); break; }
     case 'pl-add': { const c = clientById(r.id); c.pillars.push({ id: uid(), name: `Filar ${c.pillars.length + 1}`, color: PILLAR_COLORS[c.pillars.length % PILLAR_COLORS.length], goal: '', audience: '', desc: '', what: '', examples: '' }); save(); render(); break; }
     case 'pl-del': { const c = clientById(r.id); const p = c.pillars[+el.dataset.i]; if (!confirm(`Usunąć filar „${p.name}”? Treści zachowają nazwę filaru.`)) return; c.pillars.splice(+el.dataset.i, 1); save(); render(); break; }
@@ -1474,7 +1485,7 @@ document.addEventListener('click', async e => {
     case 'pv': drawer.pv = el.dataset.v; refreshPreview(); break;
     case 'add-tags': { const d = drawer.draft, c = clientById(d.clientId); const have = new Set(d.hashtags.split(/\s+/)); const add = c.hashtags.split(/\s+/).filter(t => t && !have.has(t));
       d.hashtags = (d.hashtags.trim() + ' ' + add.join(' ')).trim(); drawer.dirty = true; renderDrawerKeepScroll(); break; }
-    case 'upload': addMedia(await pickFiles('image/png,image/jpeg,image/webp,image/gif', true)); break;
+    case 'upload': addMedia(await pickFiles('image/*,.svg,.jfif,.webp,.avif', true)); break;
     case 'add-link': { const v = $('#linkIn').value.trim(); if (!/^https?:\/\//i.test(v)) { toast('Wklej pełny link zaczynający się od https://'); return; }
       drawer.draft.media.push({ id: uid(), type: 'link', url: v, thumb: '', name: linkName(v) }); drawer.dirty = true; renderDrawerKeepScroll(); break; }
     case 'm-del': drawer.draft.media.splice(+el.dataset.i, 1); drawer.dirty = true; renderDrawerKeepScroll(); break;
