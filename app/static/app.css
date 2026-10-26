@@ -69,10 +69,12 @@ h1,h2,h3{margin:0;font-weight:650;letter-spacing:-.01em}
 .notif-it .tx q{display:block;color:var(--muted);margin-top:2px;quotes:"„" "”";overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .notif-it .when{font-size:11.5px;color:var(--faint);margin-top:3px}
 .notif-overlay{position:fixed;inset:0;z-index:44}
+.avatar-drop{border:1.5px dashed transparent;border-radius:12px;padding:8px;margin:-8px -8px 6px;transition:all .12s}
+.avatar-drop.over{border-color:var(--accent);background:var(--accent-soft)}
 .team-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border2)}
 .team-row.off{opacity:.6}
 .av{border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:600;flex:none;overflow:hidden;background:#999}
-.av img{width:100%;height:100%;object-fit:cover}
+.av img{width:100%;height:100%;object-fit:contain;background:#fff}  /* logo mieści się w całości */
 
 .main{min-width:0}
 .container{max-width:1280px;margin:0 auto;padding:26px 32px 60px}
