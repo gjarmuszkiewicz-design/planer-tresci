@@ -205,7 +205,7 @@ function newPost(o = {}) {
 }
 function newClient(o = {}) {
   return { id: uid(), token: newToken(), name: 'Nowy klient', color: '#4f46e5', avatar: '', igHandle: '', fbName: '', liName: '', liFollowers: '',
-    freq: '', tone: '', audience: '', pillars: [], hashtags: '', drive: '', contact: '', notes: '', ...o };
+    freq: '', tone: '', audience: '', strategy: '', pillars: [], hashtags: '', drive: '', contact: '', notes: '', ...o };
 }
 
 /* ================= ui state ================= */
@@ -448,7 +448,8 @@ function viewTable(c) {
     </div>
     <div class="row wrap" style="margin-top:12px"><span class="small muted">${ps.length} pozycji · kliknij wiersz, aby edytować · kliknij status publikacji, aby go przełączyć</span><span class="grow"></span>
       <button class="btn sm" data-act="import-xlsx" data-client="${c.id}">⤒ Import z Excela</button>
-      <button class="btn sm" data-act="xlsx" data-id="${c.id}">⤓ Eksport do Excela</button></div>
+      <button class="btn sm" data-act="xlsx" data-id="${c.id}">⤓ Eksport do Excela</button>
+      <button class="btn sm ghost" data-act="xlsx-blank" data-id="${c.id}" title="Pusty plan w tym samym układzie (FB + IG, LinkedIn, Opis filarów) – do wypełnienia i zaimportowania">⤓ Pusty szablon</button></div>
     ${ui.month !== 'all' ? `<div class="card notes-card" style="margin-top:16px"><div class="card-h"><h3>Uwagi operacyjne i do potwierdzenia</h3><span class="small muted">· ${monthLabel(ui.month).toLowerCase()} · widoczne dla klienta</span></div>
       <div class="card-b"><textarea class="input" data-notes="${ui.month}" placeholder="Zasady publikacji, rzeczy do potwierdzenia z klientem przed publikacją…">${esc(md.notes)}</textarea></div></div>` : ''}`;
 }
@@ -505,7 +506,8 @@ function viewProfile(c) {
       <button class="btn sm ghost" data-act="pl-del" data-i="${i}" title="Usuń filar">✕</button></div>
     <div class="two">${pf(i, 'goal', 'Cel filaru')}${pf(i, 'audience', 'Grupa docelowa')}</div>
     ${pf(i, 'desc', 'Opis', '', 1)}
-    <div class="two">${pf(i, 'what', 'Co publikujemy', '', 1)}${pf(i, 'examples', 'Przykłady tematów', '', 1)}</div></div>`).join('');
+    <div class="two">${pf(i, 'what', 'Co publikujemy', '', 1)}${pf(i, 'examples', 'Przykłady tematów', '', 1)}</div>
+    <div class="two">${pf(i, 'avoid', 'Czego unikać i najczęstsze błędy', '', 1)}${pf(i, 'tips', 'Rekomendacje', '', 1)}</div></div>`).join('');
   return `<div class="settings">
     <div class="card"><div class="card-h"><h3>Klient</h3></div><div class="card-b">
       <div class="row avatar-drop" data-avatar-drop style="gap:14px;margin-bottom:14px" title="Przeciągnij tu plik z logo">${avatar(c, 64)}
@@ -526,6 +528,7 @@ function viewProfile(c) {
     </div></div>
     <div class="card" style="grid-column:1/-1"><div class="card-h"><h3>Strategia</h3></div><div class="card-b">
       <div class="two">${f('tone', 'Ton komunikacji', 'np. bez długich myślników i list, emoji z umiarem', 'textarea')}<div>${f('audience', 'Grupa docelowa')}${f('hashtags', 'Stałe hashtagi', '#marka #branża')}</div></div>
+      ${f('strategy', 'Jak filary współgrają', 'np. Filar 1 przyciąga uwagę, Filar 2 pokazuje ofertę, Filar 3 domyka decyzję zaufaniem', 'textarea')}
     </div></div>
     <div class="card" style="grid-column:1/-1"><div class="card-h"><h3>Filary komunikacji</h3><span class="small muted">· podpowiadane w edytorze, kolor widać w planie i kalendarzu</span><span class="grow"></span><button class="btn sm" data-act="pl-add">＋ Dodaj filar</button></div>
       <div class="card-b">${pillars || '<div class="small muted">Brak filarów. Dodaj je ręcznie albo zaimportuj z arkusza „Opis filarów”.</div>'}
@@ -1033,11 +1036,32 @@ async function loadExcelJS() {
   });
 }
 
+/* ================= Excel: wspólny schemat importu i eksportu =================
+   Zakładki: „Czerwiec 2026” (Facebook + Instagram), „LinkedIn – Czerwiec 2026”, „Opis filarów”.
+   Kolumny A–K jak w szablonie agencji, L–R to dane z aplikacji. R (ukryta) = ID treści: łączy wiersz
+   z zakładki FB + IG z wierszem z zakładki LinkedIn w jedną treść przy imporcie. */
+const XLS_COLS = [
+  ['DATA', 16], ['FORMAT', 14], ['FILAR', 26], ['TEMAT', 40], ['OPIS POSTA', 48], ['TREŚĆ POSTA', 85], ['CTA', 28], ['OZNACZENIA', 18], ['HASZTAGI', 22],
+  ['MATERIAŁ — OPIS', 30], ['MATERIAŁ — PLIKI / LINKI', 61],
+  ['GODZINA', 10], ['TEKST NA GRAFICE', 30], ['DO POTWIERDZENIA', 30], ['STATUS AKCEPTACJI', 16], ['UWAGI KLIENTA', 40], ['PUBLIKACJA', 18], ['ID TREŚCI', 12],
+];
+const XLS_APP_COL = 12;   // od kolumny L zaczynają się dane z aplikacji
+const XLS = { dark: 'FF2C2C2C', gold: 'FFDA9E3C', brown: 'FF561C0C', grey: 'FFF2F2F2', cream: 'FFF7F2EA', app: 'FF43337B', reserve: 'FFD9D9D9', text: 'FF333333' };
+const XLS_UNDATED = 'W TYGODNIU';
+// zakładka „Opis filarów”: wiersze etykieta | wartość i bloki tekstu pod nagłówkiem
+const PROFILE_ROWS = [['Zasady i częstotliwość', 'freq', /ZASADY|CZĘSTOTLIW|KANAŁY|RYTM/], ['Ton komunikacji', 'tone', /^TON/], ['Grupa docelowa', 'audience', /^GRUPA/], ['Stałe hashtagi', 'hashtags', /HA(SZ|SH)TAG/]];
+const PILLAR_ROWS = [['Cel filaru', 'goal', /^CEL/], ['Grupa docelowa', 'audience', /^GRUPA/]];
+const PILLAR_BLOCKS = [['OPIS', 'desc', /^OPIS$/], ['CO PUBLIKUJEMY', 'what', /^CO PUBLIKUJEMY/], ['PRZYKŁADY TEMATÓW', 'examples', /^PRZYKŁADY/],
+  ['CZEGO UNIKAĆ I NAJCZĘSTSZE BŁĘDY', 'avoid', /^CZEGO UNIKA/], ['REKOMENDACJE', 'tips', /^REKOMENDACJE/]];
+const pillarShort = s => String(s || '').replace(/^filar\s*\d+\s*[:\-–—]\s*/i, '');   // „Filar 1: Głos eksperta” → „Głos eksperta”
+const pillarBase = s => pkey(pillarShort(s));
+
 /* ================= Excel: import ================= */
 const FIELDS = {
   skip: 'Pomiń', date: 'Data', time: 'Godzina', format: 'Format', pillar: 'Filar', title: 'Temat', brief: 'Założenie / opis pomysłu', goal: 'Cel (do założenia)',
   copyMeta: 'Opis FB + IG', copyLi: 'Opis LinkedIn', onGraphic: 'Tekst na grafice', cta: 'CTA', hashtags: 'Hashtagi', mentions: 'Oznaczenia',
   materialBrief: 'Materiał – opis', media: 'Materiał – pliki / linki', toConfirm: 'Do potwierdzenia', clientComment: 'Uwagi klienta (→ komentarz)', note: 'Notatka wewnętrzna',
+  approval: 'Status akceptacji', published: 'Publikacja (status)', pid: 'ID treści (łączy FB + IG z LinkedIn)',
 };
 const norm = s => String(s ?? '').toUpperCase().replace(/[—–]/g, '-').replace(/\s+/g, ' ').trim();
 const MONTH_NORM = ['STYCZEN', 'LUTY', 'MARZEC', 'KWIECIEN', 'MAJ', 'CZERWIEC', 'LIPIEC', 'SIERPIEN', 'WRZESIEN', 'PAZDZIERNIK', 'LISTOPAD', 'GRUDZIEN'];
@@ -1077,6 +1101,10 @@ function guessField(h, layout, ch) {
   const n = norm(h);
   if (/^DATA/.test(n)) return 'date';
   if (/^GODZ/.test(n)) return 'time';
+  if (/^ID TREŚCI/.test(n)) return 'pid';
+  if (/^STATUS AKCEPTACJI/.test(n)) return 'approval';
+  if (/^PUBLIKACJA/.test(n)) return 'published';
+  if (/^TEKST NA GRAFICE/.test(n)) return 'onGraphic';
   if (n === 'FORMAT') return 'format';
   if (/^FILAR/.test(n)) return 'pillar';
   if (n === 'TEMAT') return 'title';
@@ -1103,8 +1131,45 @@ function parsePillarLine(t) {
     return { num: +m[1], name: name.trim(), desc: rest.join(', ').trim() };
   }).filter(Boolean);
 }
+const addText = (a, b) => a ? a + '\n' + b : b;
+// "Opis filarów": tytuł, wstęp, PROPORCJE I RYTM (etykieta | wartość), potem FILAR n z opisem, polami i blokami tekstu
+function parsePillarSheet(rows, pillars, profile) {
+  let cur = null, expect = null, sec = 'intro', hint = '';
+  rows.forEach(row => {
+    const cs = [...row.cells.values()], t = cs[0].t, n = norm(t).replace(/:$/, '');
+    const v = cs.slice(1).map(x => x.t).join('\n'), inline = v || (t.includes(':') ? t.replace(/^[^:]*:\s*/, '') : '');
+    if (/PLAN TREŚCI/.test(n) && !cur) { hint = t.replace(/^.*PLAN TREŚCI\s*/i, '').trim(); return; }
+    if (/NA KTÓRYCH OPIERAMY/.test(n)) return;
+    const m = t.match(/^FILAR\s*(\d+)\s*[-–—:]\s*(.+)$/i);
+    if (m) { cur = { num: +m[1], name: `Filar ${m[1]}: ${sentence(m[2].trim())}`, goal: '', audience: '', desc: '', what: '', examples: '', avoid: '', tips: '' }; pillars.push(cur); expect = null; return; }
+    if (/^PROPORCJE/.test(n)) { cur = null; sec = 'rhythm'; return; }
+    if (cur) {
+      const pr = PILLAR_ROWS.find(x => x[2].test(n));
+      if (pr) { cur[pr[1]] = inline; expect = null; return; }
+      const pb = PILLAR_BLOCKS.find(x => x[2].test(n));
+      if (pb) { expect = pb[1]; if (inline) cur[expect] = addText(cur[expect], inline); return; }
+      if (cs[0].b && cs.length === 1) { cur = null; sec = 'extra'; profile.strategy = addText(profile.strategy, '\n' + t); return; }
+      cur[expect || 'desc'] = addText(cur[expect || 'desc'], [t, v].filter(Boolean).join(' '));
+      return;
+    }
+    const pr = sec === 'rhythm' && PROFILE_ROWS.find(x => x[2].test(n));
+    if (pr) { if (v) profile[pr[1]] = addText(profile[pr[1]], v); return; }
+    if (cs[0].b && cs.length === 1 && sec !== 'intro') { sec = 'extra'; profile.strategy = addText(profile.strategy, '\n' + t); return; }
+    if (sec === 'rhythm' && v) { profile.freq = addText(profile.freq, `${t}: ${v}`); return; }
+    profile.strategy = addText(profile.strategy, [t, v].filter(Boolean).join(' '));
+  });
+  profile.strategy = (profile.strategy || '').trim();
+  return hint;
+}
 function analyzeWorkbook(wb, fileName) {
-  const sheets = [], pillars = []; let clientHint = '';
+  const sheets = [], pillars = [], profile = {}; let clientHint = '';
+  // ten sam filar z linii „FILARY KOMUNIKACJI” i z zakładki „Opis filarów” – łączymy po numerze, nazwa z linii (jest dokładna)
+  const addPillar = (p, fromLine) => {
+    const ex = p.num && pillars.find(x => x.num === p.num);
+    if (!ex) { pillars.push(p); return; }
+    Object.keys(p).forEach(k => { if (p[k] && !ex[k]) ex[k] = p[k]; });
+    if (fromLine) ex.name = p.name;
+  };
   wb.eachSheet(ws => {
     const rows = [];
     ws.eachRow({ includeEmpty: false }, (row, r) => {
@@ -1112,38 +1177,25 @@ function analyzeWorkbook(wb, fileName) {
       row.eachCell({ includeEmpty: false }, (cell, c) => {
         if (cell.isMerged && cell.master !== cell) return;
         const t = cellText(cell.value); if (!t.trim()) return;
-        cells.set(c, { v: cell.value, t: t.trim() });
+        cells.set(c, { v: cell.value, t: t.trim(), b: !!cell.font?.bold });
       });
       if (cells.size) rows.push({ r, cells, first: [...cells.entries()][0] });
     });
     const sh = { name: ws.name, ws, type: 'skip', rows: [], headers: [], map: {}, channel: 'meta', sheetMonth: monthFromText(ws.name), on: false, images: [] };
     const hi = rows.findIndex(row => [...row.cells.values()].some(x => /^DATA/.test(norm(x.t))) && [...row.cells.values()].some(x => norm(x.t) === 'TEMAT'));
     if (hi < 0) {
-      // "Opis filarów" sheet
-      const txt = rows.map(r => r.first[1].t);
-      if (txt.some(t => /^FILAR\s*\d+\s*[-–—:]/i.test(t))) {
+      if (rows.some(r => /^FILAR\s*\d+\s*[-–—:]/i.test(r.first[1].t))) {
         sh.type = 'pillars'; sh.on = true;
-        const title = txt.find(t => /PLAN TREŚCI/i.test(t)); if (title) clientHint = title.replace(/^.*PLAN TREŚCI\s*/i, '').trim();
-        let cur = null, expect = null;
-        txt.forEach(t => {
-          const m = t.match(/^FILAR\s*(\d+)\s*[-–—:]\s*(.+)$/i);
-          if (m) { cur = { num: +m[1], name: `Filar ${m[1]}: ${sentence(m[2])}`, goal: '', audience: '', desc: '', what: '', examples: '' }; pillars.push(cur); expect = null; return; }
-          if (!cur) return;
-          const n = norm(t);
-          if (/^CEL FILARU/.test(n)) { cur.goal = t.replace(/^cel filaru\s*:?\s*/i, ''); expect = null; }
-          else if (/^GRUPA DOCELOWA/.test(n)) { cur.audience = t.replace(/^grupa docelowa\s*:?\s*/i, ''); expect = null; }
-          else if (n === 'OPIS') expect = 'desc';
-          else if (/^CO PUBLIKUJEMY/.test(n)) expect = 'what';
-          else if (/^PRZYKŁADY/.test(n)) expect = 'examples';
-          else if (expect) cur[expect] += (cur[expect] ? '\n' : '') + t;
-        });
-        sh.info = `${pillars.length} filarów`;
+        const found = [];
+        clientHint = parsePillarSheet(rows, found, profile) || clientHint;
+        found.forEach(p => addPillar(p, false));
+        sh.info = `${found.length} filarów` + (Object.values(profile).some(Boolean) ? ' i zasady komunikacji' : '');
       }
       sheets.push(sh); return;
     }
     sh.type = 'plan'; sh.on = !!monthFromText(ws.name + ' 2000') || /linkedin/i.test(ws.name);
     const before = rows.slice(0, hi).map(r => [...r.cells.values()].map(x => x.t).join(' '));
-    before.forEach(t => { if (/FILARY KOMUNIKACJI/i.test(t)) parsePillarLine(t).forEach(p => pillars.push(p)); if (!sh.sheetMonth) sh.sheetMonth = monthFromText(t); });
+    before.forEach(t => { if (/FILARY KOMUNIKACJI/i.test(t)) parsePillarLine(t).forEach(p => addPillar(p, true)); if (!sh.sheetMonth) sh.sheetMonth = monthFromText(t); });
     if (/linkedin/i.test(ws.name) || before.some(t => /^LINKEDIN$/i.test(t.trim()))) sh.channel = 'li';
     const hdr = rows[hi];
     sh.headers = [...hdr.cells.entries()].map(([c, x]) => ({ c, text: x.t }));
@@ -1155,7 +1207,7 @@ function analyzeWorkbook(wb, fileName) {
     sh.images = ws.getImages().map(im => ({ row: Math.floor((im.range?.tl?.nativeRow ?? im.range?.tl?.row ?? -1)) + 1, imageId: im.imageId }));
     sheets.push(sh);
   });
-  return { fileName, sheets, pillars, clientHint };
+  return { fileName, sheets, pillars, profile, clientHint };
 }
 function matchPillar(str, list) {
   const s = String(str || '').trim(); if (!s) return '';
@@ -1188,22 +1240,28 @@ function buildSheet(sh, pillars) {
     if (mode === 'skip') continue;
     if (/^TYDZIE/.test(ft)) {
       const n = +(ft.match(/TYDZIE\S*\s*(\d+)/) || [])[1] || null;
-      const rg = ft.match(/(\d{1,2})\s*(?:\.\d{1,2})?\s*[-–]\s*(\d{1,2})\.(\d{1,2})/);
+      const full = [...row.cells.values()].map(x => x.t).join(' | ');
+      const rg = full.match(/(\d{1,2})(?:\.(\d{1,2}))?\s*[-–]\s*(\d{1,2})\.(\d{1,2})/);
       const clean = s => { s = s.replace(/\b(DATA|TEMAT)\s*:/gi, '').replace(/^[\s|·:]+|[\s|·:]+$/g, '').trim(); return /^\d{1,2}\s*[-–]\s*\d{1,2}\.?\s*[\p{L}\d.]*$/u.test(s) ? '' : s; };
       const inA = clean(row.first[1].t.replace(/^TYDZIE\S*\s*\d*\s*(\([^)]*\))?\s*[:|]?\s*/i, ''));
-      const theme = [inA, ...[...row.cells.entries()].slice(1).map(([, x]) => clean(x.t))].filter(Boolean).join(' · ');
-      cur = { n, rg: rg ? { d: +rg[1], m: +rg[3] } : null, theme, posts: [] }; sections.push(cur); continue;
+      // „TYDZIEŃ 1: DATA: 1.06 – 7.06 | TEMAT: …” – temat to wszystko po „TEMAT:”
+      const theme = /TEMAT\s*:/i.test(full) ? full.replace(/^[\s\S]*?TEMAT\s*:/i, '').replace(/^[\s|·:]+|[\s|·:]+$/g, '').trim()
+        : [inA, ...[...row.cells.entries()].slice(1).map(([, x]) => clean(x.t))].filter(Boolean).join(' · ');
+      cur = { n, rg: rg ? { d: +rg[1], m: +(rg[2] || rg[4]) } : null, theme, posts: [] }; sections.push(cur); continue;
     }
     if (/^REZERWA\s*(\||$)/.test(ft)) { cur = { reserve: true, posts: [] }; sections.push(cur); continue; }
     const dcell = dateCol != null ? row.cells.get(dateCol) : null;
     const date = dcell ? parseDateCell(dcell.v) : '';
     const isRes = dcell && /^REZERWA/i.test(dcell.t);
-    if (dcell && !date && !isRes) { cur = { n: null, theme: rowText(row), posts: [] }; sections.push(cur); continue; }
+    const undated = dcell && /^(W TYGODNIU|DO USTALENIA|BEZ DATY|BEZ DNIA)/i.test(dcell.t);
+    if (dcell && !date && !isRes && !undated) { cur = { n: null, theme: rowText(row), posts: [] }; sections.push(cur); continue; }
     const hasContent = ['title', 'copyMeta', 'copyLi', 'brief', 'onGraphic'].some(f => val(row, f));
     const slot = !hasContent && val(row, 'format');   // empty planned slot, e.g. "REZERWA 1 | POST"
     if (!hasContent && !slot) { if (!dcell) notes.push(rowText(row)); continue; }
     if (!val(row, 'format') && !val(row, 'title') && !date) { notes.push(rowText(row)); continue; }
     const comment = val(row, 'clientComment');
+    const status = Object.keys(APPROVAL).find(k => norm(APPROVAL[k].label) === norm(val(row, 'approval')));
+    const pub = val(row, 'published'), published = /^OPUBLIKOWAN/i.test(pub);
     const fmt = val(row, 'format');
     const brief = [val(row, 'brief'), val(row, 'goal') && 'Cel: ' + val(row, 'goal')].filter(Boolean).join('\n');
     const p = {
@@ -1212,8 +1270,9 @@ function buildSheet(sh, pillars) {
       brief, copyMeta: sh.channel === 'li' ? '' : val(row, 'copyMeta'), copyLi: val(row, 'copyLi') || (sh.channel === 'li' ? val(row, 'copyMeta') : ''),
       onGraphic: val(row, 'onGraphic'), cta: val(row, 'cta'), hashtags: val(row, 'hashtags'), mentions: val(row, 'mentions'), materialBrief: val(row, 'materialBrief'),
       toConfirm: val(row, 'toConfirm'), note: val(row, 'note'),
-      links: fieldCols('media').flatMap(c => cellLinks(row.cells.get(c)?.v)), comment,
-      approval: slot ? 'draft' : commentStatus(comment),
+      links: fieldCols('media').flatMap(c => cellLinks(row.cells.get(c)?.v)), comment, pid: val(row, 'pid'),
+      approval: status || (slot ? 'draft' : commentStatus(comment)),
+      published, publishedAt: published ? parseDateCell(pub) : '',
     };
     posts.push(p); cur?.posts?.push(p);
   }
@@ -1229,7 +1288,7 @@ function buildSheet(sh, pillars) {
     if (s.reserve) return;
     const dated = s.posts.find(p => p.date);
     if (dated) s.mon = mondayOf(dated.date);
-    else if (s.rg) s.mon = mondayOf(`${month.slice(0, 4)}-${pad(s.rg.m)}-${pad(s.rg.d)}`);
+    else if (s.rg) s.mon = mondayOf(`${+month.slice(0, 4) - (s.rg.m === 12 && month.endsWith('-01') ? 1 : 0)}-${pad(s.rg.m)}-${pad(s.rg.d)}`);
   });
   const ref = sections.find(s => s.mon && s.n);
   sections.forEach(s => {
@@ -1283,10 +1342,29 @@ function renderImport() {
       </div>
       ${an.pillars.length ? `<div class="guide" style="margin-bottom:12px"><b>Filary z pliku:</b> ${an.pillars.map(p => esc(p.name)).join(' · ')}</div>` : ''}
       ${an.sheets.map(sheetRow).join('')}
-      <div class="guide">Kolumny „Komentarz”, „Korekta opisu”, „Uwagi…” trafiają jako uwagi klienta: wpis zaczynający się od „ok” oznacza <b>Zaakceptowany</b>, inna treść oznacza <b>Do poprawy</b>, a brak wpisu oznacza <b>Do akceptacji</b>. Grafiki wklejone w arkusz są przypinane do wiersza, w którym leżą. Kolory wierszy nie są importowane.</div>
+      <div class="guide">Kolumny „Komentarz”, „Korekta opisu”, „Uwagi…” trafiają jako uwagi klienta. Jeśli plik ma kolumnę „Status akceptacji” (plik z eksportu albo pusty szablon), status jest brany z niej. W starszych plikach wpis zaczynający się od „ok” oznacza <b>Zaakceptowany</b>, inna treść oznacza <b>Do poprawy</b>, a brak wpisu oznacza <b>Do akceptacji</b>. Ta sama treść w zakładce FB + IG i w zakładce LinkedIn staje się jedną treścią na obu kanałach. Grafiki wklejone w arkusz są przypinane do wiersza, w którym leżą. Kolory wierszy nie są importowane.</div>
     </div>
     <div class="modal-f"><span class="small muted" style="margin-right:auto">${total} treści do zaimportowania</span><button class="btn" data-act="close-modal">Anuluj</button>
       <button class="btn primary" data-act="do-import" ${imp.busy || !total ? 'disabled' : ''}>${imp.busy ? '<span class="spinner"></span> Importuję…' : 'Importuj'}</button></div>`, true);
+}
+// uwagi klienta z eksportu: „[Autor] treść”, kolejne uwagi oddzielone pustą linią
+function excelComments(t) {
+  if (!t || !t.trim()) return [];
+  const blocks = /^\[[^\]\n]{1,60}\]/.test(t.trim()) ? t.split(/\n\s*\n(?=\[)/) : [t];
+  return blocks.map(b => b.trim()).filter(Boolean).map(b => {
+    const m = b.match(/^\[([^\]\n]{1,60})\]\s*([\s\S]*)$/);
+    return { id: uid(), role: 'client', author: m ? m[1] : 'Klient (z Excela)', text: m ? m[2] : b, at: Date.now() };
+  });
+}
+const imgSize = src => new Promise(res => { const i = new Image(); i.onload = () => res({ w: i.naturalWidth, h: i.naturalHeight }); i.onerror = () => res({}); i.src = src; });
+// link do grafiki z tej aplikacji (/media/<id>) wraca jako grafika, każdy inny zostaje linkiem
+async function linkToMedia(u) {
+  const m = u.match(/^(https?:\/\/[^/]+)?\/media\/([a-f0-9]{32})$/);
+  if (m && (!m[1] || new URL(u).host === location.host)) {
+    const src = `/media/${m[2]}`;
+    return { id: m[2], type: 'image', src, name: 'grafika', ...(await imgSize(src)) };
+  }
+  return { id: uid(), type: 'link', url: u, thumb: '', name: linkName(u) };
 }
 async function doImport() {
   const { an } = imp;
@@ -1296,37 +1374,58 @@ async function doImport() {
     if (imp.client === '__new') { c = newClient({ name: imp.newName.trim() || 'Nowy klient', color: PILLAR_COLORS[state.clients.length % PILLAR_COLORS.length] }); state.clients.push(c); }
     else c = clientById(imp.client);
     const pillarsOn = an.sheets.some(s => s.type === 'pillars' && s.on) || an.pillars.some(p => !p.goal);
+    // filar o tej samej nazwie (z „Filar n:” albo bez) uzupełniamy, nie dublujemy; zwraca nazwę używaną w treściach
     const addPillar = (name, extra = {}) => {
-      if (!name) return; const ex = c.pillars.find(p => pkey(p.name) === pkey(name));
-      if (ex) { Object.entries(extra).forEach(([k, v]) => { if (v && !ex[k]) ex[k] = v; }); return; }
-      c.pillars.push({ id: uid(), name, color: PILLAR_COLORS[c.pillars.length % PILLAR_COLORS.length], goal: '', audience: '', desc: '', what: '', examples: '', ...extra });
+      if (!name) return '';
+      const ex = c.pillars.find(p => pkey(p.name) === pkey(name)) || c.pillars.find(p => pillarBase(p.name) === pillarBase(name));
+      if (ex) { Object.entries(extra).forEach(([k, v]) => { if (v && !ex[k]) ex[k] = v; }); return ex.name; }
+      c.pillars.push({ id: uid(), name, color: PILLAR_COLORS[c.pillars.length % PILLAR_COLORS.length], goal: '', audience: '', desc: '', what: '', examples: '', avoid: '', tips: '', ...extra });
+      return name;
     };
-    if (pillarsOn) an.pillars.forEach(p => addPillar(p.name, { goal: p.goal || '', audience: p.audience || '', desc: p.desc || '', what: p.what || '', examples: p.examples || '' }));
-    const imported = new Set();
+    if (pillarsOn) {
+      an.pillars.forEach(p => addPillar(p.name, Object.fromEntries(['goal', 'audience', 'desc', 'what', 'examples', 'avoid', 'tips'].map(k => [k, p[k] || '']))));
+      Object.entries(an.profile).forEach(([k, v]) => { if (v && !c[k]) c[k] = v; });
+    }
+    const imported = new Set(), byKey = new Map(), viaUrl = new Set(), imgSheet = new Map(), notesDone = new Set();
     let count = 0, imgs = 0;
     for (const s of an.sheets.filter(s => s.type === 'plan' && s.on)) {
-      const b = buildSheet(s, an.pillars);
+      const b = buildSheet(s, an.pillars), ch = s.channel;
       if (imp.replace && imp.client !== '__new') {
         const months = new Set(b.posts.map(p => p.month).concat(b.month));
         state.posts = state.posts.filter(p => !(p.clientId === c.id && months.has(postMonth(p)) && !imported.has(p)));
       }
       const md = monthDataW(c.id, b.month);
       Object.assign(md.weeks, b.weeks);
-      if (b.notes) md.notes = md.notes && (imp.client === '__new' || !imp.replace || md._imp) ? md.notes + '\n' + b.notes : b.notes;
+      if (b.notes && !md.notes.includes(b.notes)) md.notes = md.notes && (notesDone.has(b.month) || imp.client === '__new' || !imp.replace) ? md.notes + '\n' + b.notes : b.notes;
+      notesDone.add(b.month);
       const byRow = new Map();
-      b.posts.forEach((x, i) => {
-        addPillar(x.pillar);
-        const p = newPost({ clientId: c.id, date: x.date, month: x.month, week: x.week, time: x.time, meta: s.channel === 'meta', li: s.channel === 'li' || !!x.copyLi,
-          format: x.format, pillar: x.pillar, title: x.title, brief: x.brief, copyMeta: x.copyMeta, copyLi: x.copyLi, onGraphic: x.onGraphic, cta: x.cta, hashtags: x.hashtags,
+      for (const [i, x] of b.posts.entries()) {
+        const media = [];
+        for (const u of x.links) { const m = await linkToMedia(u); if (!media.some(o => (o.src || o.url) === (m.src || m.url))) media.push(m); }
+        // ta sama treść z zakładki FB + IG i z zakładki LinkedIn (ID treści albo data + temat) → jedna treść na obu kanałach
+        const key = x.pid || (x.date && x.title ? `${x.date}|${pkey(x.title)}` : '');
+        const twin = key && byKey.get(key);
+        if (twin && !twin[ch]) {
+          twin[ch] = true;
+          if (ch === 'li') twin.copyLi = x.copyLi; else twin.copyMeta = x.copyMeta;
+          ['time', 'brief', 'onGraphic', 'cta', 'hashtags', 'mentions', 'materialBrief', 'toConfirm', 'note'].forEach(k => { if (!twin[k] && x[k]) twin[k] = x[k]; });
+          media.forEach(m => { if (!twin.media.some(o => (o.src || o.url) === (m.src || m.url))) twin.media.push(m); });
+          if (media.some(m => m.type === 'image')) viaUrl.add(twin);
+          byRow.set(x._row, twin); continue;
+        }
+        const p = newPost({ clientId: c.id, date: x.date, month: x.month, week: x.week, time: x.time, meta: ch === 'meta', li: ch === 'li' || !!x.copyLi,
+          format: x.format, pillar: addPillar(x.pillar), title: x.title, brief: x.brief, copyMeta: x.copyMeta, copyLi: x.copyLi, onGraphic: x.onGraphic, cta: x.cta, hashtags: x.hashtags,
           mentions: x.mentions, materialBrief: x.materialBrief, toConfirm: x.toConfirm, note: x.note, approval: x.approval, order: i,
-          media: x.links.map(u => ({ id: uid(), type: 'link', url: u, thumb: '', name: linkName(u) })),
-          comments: x.comment ? [{ id: uid(), role: 'client', author: 'Klient (z Excela)', text: x.comment, at: Date.now() }] : [] });
-        state.posts.push(p); imported.add(p); byRow.set(x._row, p); count++;
-      });
+          published: x.published, publishedAt: x.publishedAt, media, comments: excelComments(x.comment) });
+        if (media.some(m => m.type === 'image')) viaUrl.add(p);
+        state.posts.push(p); imported.add(p); byRow.set(x._row, p); if (key) byKey.set(key, p); count++;
+      }
       for (const im of s.images) {
         let target = byRow.get(im.row);
         if (!target) { const rows = [...byRow.keys()].filter(r => r <= im.row && im.row - r <= 2).sort((a, z) => z - a); target = byRow.get(rows[0]); }
-        if (!target) continue;
+        // miniatura z eksportu: grafika jest już w treści z linku albo z drugiej zakładki
+        if (!target || viaUrl.has(target) || (imgSheet.has(target) && imgSheet.get(target) !== s.name)) continue;
+        imgSheet.set(target, s.name);
         try {
           const img = an.wb.getImage(im.imageId);
           const blob = new Blob([img.buffer], { type: 'image/' + (img.extension === 'jpg' ? 'jpeg' : img.extension) });
@@ -1354,56 +1453,133 @@ async function firstImages(posts) {
       const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/jpeg' ? 'jpeg' : null;
       if (!ext) return;
       const base64 = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); });
-      out.set(p.id, { base64, ext });
+      out.set(p.id, { base64, ext, w: m.w, h: m.h });
     } catch { /* grafika niedostępna – eksport bez miniatury */ }
   }));
   return out;
 }
-async function exportXlsx(c) {
+const xFill = argb => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
+const xLine = { style: 'thin', color: { argb: 'FFC0C0C0' } };
+const xBorder = { top: xLine, left: xLine, bottom: xLine, right: xLine };
+const xDate = s => { const [y, m, d] = s.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); };   // Excel liczy daty w UTC
+const dmy = s => s ? s.split('-').reverse().join('.') : '';
+// jasny odcień koloru filaru na tło komórki
+function xTint(hex, k = .8) {
+  const n = parseInt(String(hex || '').replace('#', ''), 16); if (isNaN(n)) return XLS.cream;
+  const ch = s => Math.round(((n >> s) & 255) * (1 - k) + 255 * k).toString(16).padStart(2, '0');
+  return ('FF' + ch(16) + ch(8) + ch(0)).toUpperCase();
+}
+const xLines = (v, width) => String(v ?? '').split('\n').reduce((s, l) => s + Math.max(1, Math.ceil(l.length / (width * 1.15))), 0);
+function xBand(ws, text, argb, { color = 'FFFFFFFF', bold = true, size = 11, height = 21.75, align = 'left', to = XLS_COLS.length } = {}) {
+  const r = ws.addRow([text]); ws.mergeCells(r.number, 1, r.number, to);
+  const cell = r.getCell(1); if (argb) cell.fill = xFill(argb);
+  cell.font = { name: 'Calibri', size, bold, color: { argb: color } };
+  cell.alignment = { horizontal: align, vertical: 'middle', wrapText: true }; r.height = height;
+  return r;
+}
+const X_CENTER = new Set([1, 2, 3, 12, 15, 17]);
+function planSheet(wb, c, mk, ch, posts, images, blank) {
+  const li = ch === 'li', n = XLS_COLS.length, md = blank ? { weeks: {}, notes: '' } : monthData(c.id, mk);
+  const ws = wb.addWorksheet(li ? `LinkedIn – ${monthLabel(mk)}` : monthLabel(mk));
+  ws.columns = XLS_COLS.map(([, w]) => ({ width: w }));
+  ws.getColumn(n).hidden = true;
+  const note = (t, o = {}) => xBand(ws, t, o.fill, { color: XLS.text, bold: false, size: 10, height: 27.75, ...o });
+  xBand(ws, `PLAN PUBLIKACJI SOCIAL MEDIA — ${monthLabel(mk).toUpperCase()}`, XLS.dark, { size: 14, height: 31.5, align: 'center' });
+  xBand(ws, li ? 'LinkedIn' : 'Facebook + Instagram', XLS.gold, { height: 31.5, align: 'center' });
+  note('FILARY KOMUNIKACJI: ' + c.pillars.map((p, i) => `(${i + 1}) ${p.name}`).join('  |  '), { fill: XLS.grey, height: 24, align: 'center' });
+  const hr = ws.addRow(XLS_COLS.map(([h]) => h)); hr.height = 30;
+  hr.eachCell((cell, i) => {
+    cell.fill = xFill(i >= XLS_APP_COL ? XLS.app : XLS.brown); cell.border = xBorder;
+    cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } }; cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  });
+  ws.views = [{ state: 'frozen', ySplit: 4 }];
+  const addRow = (vals, color) => {
+    const r = ws.addRow(vals);
+    for (let i = 1; i <= n; i++) {
+      const cell = r.getCell(i); cell.border = xBorder; cell.font = { name: 'Calibri', size: 10 };
+      cell.alignment = { horizontal: X_CENTER.has(i) ? 'center' : 'left', vertical: X_CENTER.has(i) ? 'middle' : 'top', wrapText: true };
+    }
+    if (color) r.getCell(3).fill = xFill(xTint(color));
+    r.height = Math.min(409, Math.max(78, 6 + 13 * Math.max(1, ...vals.map((v, i) => typeof v === 'string' ? xLines(v, XLS_COLS[i][1]) : 1))));
+    return r;
+  };
+  const addPost = p => {
+    const files = p.media.map(m => m.type === 'image' ? (m.src && !m.src.startsWith('data:') ? new URL(m.src, location.origin).href : '') : m.url).filter(Boolean);
+    const r = addRow([p.date ? xDate(p.date) : (p.week ? XLS_UNDATED : 'REZERWA'), p.format, p.pillar, p.title, p.brief, li ? p.copyLi : p.copyMeta, p.cta, p.mentions, p.hashtags,
+      p.materialBrief, files.join('\n'), p.time, p.onGraphic, p.toConfirm, APPROVAL[p.approval]?.label || '',
+      p.comments.filter(x => x.role === 'client').map(x => `[${x.author}] ${x.text}`).join('\n\n'),
+      p.published ? `Opublikowano ${dmy(p.publishedAt)}`.trim() : 'Oczekuje', p.id], pillarOf(c, p.pillar)?.color);
+    if (p.date) r.getCell(1).numFmt = 'dd.mm.yyyy';
+    const img = images.get(p.id);
+    if (img) {
+      img.id ??= wb.addImage({ base64: img.base64, extension: img.ext });
+      const h = 110, w = Math.round(Math.min(240, h * (img.w && img.h ? img.w / img.h : 1)));
+      r.getCell(11).alignment = { horizontal: 'left', vertical: 'bottom', wrapText: true };   // linki pod miniaturą
+      r.height = Math.min(409, Math.max(r.height, h * .75 + 10 + 13 * files.length));
+      ws.addImage(img.id, { tl: { col: 10, row: r.number - 1 }, ext: { width: w, height: h } });
+    }
+  };
+  const empty = k => { for (let i = 0; i < k; i++) addRow(Array(n).fill('')); };
+  const weeks = weeksOfMonth(mk);
+  weeks.forEach((w, i) => {
+    xBand(ws, `TYDZIEŃ ${i + 1}:  DATA: ${weekRange(w)}  |  TEMAT: ${md.weeks[w] || ''}`, XLS.gold);
+    sortPosts(posts.filter(p => postWeek(p) === w)).forEach(addPost);
+    if (blank) empty(3);
+  });
+  const res = sortPosts(posts.filter(p => !weeks.includes(postWeek(p))));
+  if (res.length || blank) { xBand(ws, 'REZERWA  |  posty zapasowe do podmiany', XLS.reserve, { color: XLS.text }); res.forEach(addPost); if (blank) empty(2); }
+  xBand(ws, 'LEGENDA', XLS.gold);
+  note(`POST — publikacja stała w feedzie  |  KARUZELA — kilka slajdów  |  ROLKA — reel wideo  |  RELACJA — stories (24h)  |  DATA „${XLS_UNDATED}” — dzień do ustalenia  |  DATA „REZERWA” — post zapasowy  |  Kolumny L–Q (fioletowe) — dane z planera: godzina, tekst na grafice, pytania do klienta, status akceptacji, uwagi klienta, publikacja`, { height: 30 });
+  xBand(ws, 'STRUKTURA — FILARY KOMUNIKACJI', XLS.gold);
+  c.pillars.forEach((p, i) => note(`FILAR ${i + 1} — ${pillarShort(p.name)}${p.goal ? ': ' + p.goal : ''}`, { fill: xTint(p.color), height: 30 }));
+  xBand(ws, 'UWAGI OPERACYJNE', XLS.gold);
+  md.notes.split('\n').filter(t => t.trim()).forEach(t => note(t));
+  if (blank) for (let i = 0; i < 3; i++) note('');
+}
+function pillarsSheet(wb, c, blank) {
+  const ws = wb.addWorksheet('Opis filarów');
+  ws.columns = [{ width: 32 }, { width: 131 }];
+  const band = (t, argb, o = {}) => xBand(ws, t, argb, { to: 2, ...o });
+  const text = (t, argb) => band(t, argb, { color: XLS.text, bold: false, size: 10, height: Math.max(30, 6 + 14 * xLines(t, 160)) });
+  const label = t => band(t, null, { color: XLS.text, size: 10 });
+  const pair = (l, v, argb) => {
+    const r = ws.addRow([l, v]); r.height = Math.max(21.75, 6 + 14 * xLines(v, 131));
+    [1, 2].forEach(i => { const cell = r.getCell(i); cell.font = { name: 'Calibri', size: 10, bold: i === 1 }; cell.alignment = { vertical: 'top', wrapText: true }; if (argb) cell.fill = xFill(argb); });
+  };
+  band(`OPIS FILARÓW - PLAN TREŚCI ${c.name}`, XLS.dark, { size: 14, height: 31.5, align: 'center' });
+  band(`Filary, na których opieramy komunikację profilu ${c.name}`, XLS.gold, { height: 24, align: 'center' });
+  ws.addRow([]);
+  text(c.strategy || '', XLS.cream);
+  ws.addRow([]);
+  band('PROPORCJE I RYTM', XLS.brown);
+  PROFILE_ROWS.forEach(([l, k], i) => pair(l, c[k] || '', i % 2 ? null : XLS.cream));
+  const list = c.pillars.length ? c.pillars : blank ? [0, 1, 2].map(i => ({ name: 'Nazwa filaru', color: PILLAR_COLORS[i] })) : [];
+  list.forEach((p, i) => {
+    ws.addRow([]);
+    band(`FILAR ${i + 1}  -  ${pillarShort(p.name)}`, XLS.dark);
+    text(p.desc || '', xTint(p.color, .85));
+    PILLAR_ROWS.forEach(([l, k]) => pair(l, p[k] || ''));
+    PILLAR_BLOCKS.slice(1).forEach(([l, k], j) => { label(l); text(p[k] || '', j % 2 ? XLS.cream : xTint(p.color, .85)); });
+  });
+}
+// blank = pusty szablon w tym samym układzie (filary i ustawienia klienta, bez treści)
+async function exportXlsx(c, blank = false) {
   try {
     await loadExcelJS();
     const wb = new ExcelJS.Workbook();
-    const months = ui.month === 'all' ? [...new Set(postsOf(c.id).map(postMonth))].sort() : [ui.month];
-    const cols = [['DATA', 12], ['FORMAT', 12], ['KANAŁY', 12], ['FILAR', 18], ['TEMAT', 28], ['ZAŁOŻENIE', 32], ['OPIS FB + IG', 55], ['OPIS LINKEDIN', 55], ['TEKST NA GRAFICE', 28], ['CTA', 28],
-      ['HASZTAGI', 26], ['OZNACZENIA', 18], ['MATERIAŁ — OPIS', 30], ['MATERIAŁ — PLIKI / LINKI', 30], ['DO POTWIERDZENIA', 28], ['AKCEPTACJA', 15], ['UWAGI KLIENTA', 36], ['PUBLIKACJA', 16]];
-    const fill = argb => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
+    const cur = ui.month === 'all' ? TODAY.slice(0, 7) : ui.month;
+    let months = blank || ui.month !== 'all' ? [cur] : [...new Set(postsOf(c.id).map(postMonth))].sort();
+    if (!months.length) months = [cur];
     for (const mk of months) {
-      const ws = wb.addWorksheet(monthLabel(mk).slice(0, 31));
-      ws.columns = cols.map(([, w]) => ({ width: w }));
-      const n = cols.length;
-      const band = (text, argb, color = 'FFFFFFFF', bold = true) => { const r = ws.addRow([text]); ws.mergeCells(r.number, 1, r.number, n); r.getCell(1).fill = fill(argb); r.getCell(1).font = { bold, color: { argb: color } }; r.getCell(1).alignment = { wrapText: true, vertical: 'middle' }; return r; };
-      band(`PLAN PUBLIKACJI SOCIAL MEDIA — ${monthLabel(mk).toUpperCase()} — ${c.name}`, 'FF2C2C2C').height = 24;
-      if (c.pillars.length) band('FILARY KOMUNIKACJI: ' + c.pillars.map((p, i) => `(${i + 1}) ${p.name}`).join(' | '), 'FFF2F2F2', 'FF333333', false);
-      const hr = ws.addRow(cols.map(([h]) => h));
-      hr.eachCell(cell => { cell.fill = fill('FF561C0C'); cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }; cell.alignment = { vertical: 'middle', wrapText: true }; });
-      ws.views = [{ state: 'frozen', ySplit: hr.number }];
-      const md = monthData(c.id, mk), ps = postsOf(c.id).filter(p => postMonth(p) === mk);
+      const ps = blank ? [] : postsOf(c.id).filter(p => postMonth(p) === mk);
       const images = await firstImages(ps);
-      const addPost = p => {
-        const r = ws.addRow([p.date ? parseYmd(p.date) : (p.week ? 'w tygodniu' : 'REZERWA'), p.format, chLabel(p), p.pillar, p.title, p.brief, p.copyMeta, p.copyLi, p.onGraphic, p.cta, p.hashtags, p.mentions,
-          p.materialBrief, p.media.filter(m => m.type === 'link').map(m => m.url).join('\n'), p.toConfirm, APPROVAL[p.approval].label,
-          p.comments.filter(x => x.role === 'client').map(x => `${x.author}: ${x.text}`).join('\n'), p.published ? 'Opublikowano ' + fmtShort(p.publishedAt) : 'Oczekuje']);
-        r.eachCell(cell => { cell.alignment = { wrapText: true, vertical: 'top' }; });
-        if (p.date) r.getCell(1).numFmt = 'dd.mm.yyyy';
-        const img = images.get(p.id);
-        if (img) {
-          const id = wb.addImage({ base64: img.base64, extension: img.ext });
-          const h = 110, w = Math.min(200, Math.round(h * (img.w || 1) / (img.h || 1)));
-          r.height = Math.max(r.height || 0, 90);
-          ws.addImage(id, { tl: { col: 13, row: r.number - 1 }, ext: { width: w, height: h } });
-        }
-      };
-      weeksOfMonth(mk).forEach((w, i) => {
-        const wp = sortPosts(ps.filter(p => postWeek(p) === w)); if (!wp.length && !md.weeks[w]) return;
-        band(`TYDZIEŃ ${i + 1} (${weekRange(w)})${md.weeks[w] ? ' | ' + md.weeks[w] : ''}`, 'FFDA9E3C');
-        wp.forEach(addPost);
-      });
-      const res = sortPosts(ps.filter(p => !postWeek(p)));
-      if (res.length) { band('REZERWA | posty zapasowe do podmiany', 'FFD9D9D9', 'FF333333'); res.forEach(addPost); }
-      if (md.notes) { ws.addRow([]); band('UWAGI OPERACYJNE I DO POTWIERDZENIA', 'FFDA9E3C'); md.notes.split('\n').forEach(t => { const r = ws.addRow([t]); ws.mergeCells(r.number, 1, r.number, n); r.getCell(1).alignment = { wrapText: true }; }); }
+      planSheet(wb, c, mk, 'meta', ps.filter(p => p.meta), images, blank);
+      if (blank || c.liName || ps.some(p => p.li)) planSheet(wb, c, mk, 'li', ps.filter(p => p.li), images, blank);
     }
+    pillarsSheet(wb, c, blank);
     const buf = await wb.xlsx.writeBuffer();
-    download(`Plan_${c.name.replace(/[^\p{L}\d]+/gu, '_')}_${ui.month === 'all' ? 'wszystkie' : ui.month}.xlsx`, buf, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    const base = c.name.replace(/[^\p{L}\d]+/gu, '_');
+    download(blank ? `Szablon_${base}_${cur}.xlsx` : `Plan_${base}_${ui.month === 'all' ? 'wszystkie' : ui.month}.xlsx`, buf, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   } catch (e) { console.error(e); toast('Eksport nie powiódł się: ' + e.message, 5000); }
 }
 function download(name, data, type) {
@@ -1442,9 +1618,10 @@ document.addEventListener('click', async e => {
       Object.keys(state.months).forEach(k => { if (k.startsWith(id + '|')) delete state.months[k]; }); save(true); location.hash = '#/'; break; }
     case 'client-avatar': { const c = clientById(r.id); const [f] = await pickFiles('image/*,.svg,.jfif,.webp,.avif', false); setClientAvatar(c, f); break; }
     case 'client-avatar-rm': { const c = clientById(r.id); c.avatar = ''; save(true); render(); break; }
-    case 'pl-add': { const c = clientById(r.id); c.pillars.push({ id: uid(), name: `Filar ${c.pillars.length + 1}`, color: PILLAR_COLORS[c.pillars.length % PILLAR_COLORS.length], goal: '', audience: '', desc: '', what: '', examples: '' }); save(); render(); break; }
+    case 'pl-add': { const c = clientById(r.id); c.pillars.push({ id: uid(), name: `Filar ${c.pillars.length + 1}`, color: PILLAR_COLORS[c.pillars.length % PILLAR_COLORS.length], goal: '', audience: '', desc: '', what: '', examples: '', avoid: '', tips: '' }); save(); render(); break; }
     case 'pl-del': { const c = clientById(r.id); const p = c.pillars[+el.dataset.i]; if (!confirm(`Usunąć filar „${p.name}”? Treści zachowają nazwę filaru.`)) return; c.pillars.splice(+el.dataset.i, 1); save(); render(); break; }
     case 'xlsx': exportXlsx(clientById(id)); break;
+    case 'xlsx-blank': exportXlsx(clientById(id), true); break;
     case 'import-xlsx': { const [f] = await pickFiles('.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', false); if (f) startImport(f, el.dataset.client); break; }
     case 'do-import': doImport(); break;
     case 'notif': if ($('#notif')) closeNotif(); else openNotif(); break;

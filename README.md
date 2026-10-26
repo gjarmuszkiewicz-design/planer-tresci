@@ -14,8 +14,26 @@ Jedno miejsce na plany treści wszystkich klientów: tabela jak w Excelu, kalend
 | **Podgląd** | Jak w aplikacjach: karuzela Instagrama (przycięta do proporcji 1. slajdu), kolaż Facebooka jak w Meta, dokument LinkedIn z numerem strony, Rolka, Relacja. Galeria pełnoekranowa i ostrzeżenia o limitach i przycinaniu |
 | **Profil klienta** | Konta, zasady publikacji, ton, stałe hashtagi, filary z opisem (cel, grupa, co publikujemy, przykłady) |
 | **Panel klienta** | Link `/p/<token>` bez logowania: plan z tematami tygodni, podgląd każdej treści, „Akceptuję” / „Poproś o zmiany”, komentarze. Serwer nie wysyła klientowi szkiców, notatek wewnętrznych ani ustawień agencji |
-| **Import z Excela** | Rozpoznaje nasze plany (układ Lion i see, arkusz LinkedIn, „Opis filarów”), grafiki wklejone w arkusz, tygodnie, rezerwę i uwagi; podgląd przed importem z dopasowaniem kolumn |
-| **Eksport do Excela** | Plan w podobnym układzie: tygodnie, rezerwa, uwagi, miniatury grafik |
+| **Import z Excela** | Wspólny schemat (niżej) oraz starsze plany (układ Lion i see, arkusz LinkedIn, „Opis filarów”), grafiki wklejone w arkusz, tygodnie, rezerwę i uwagi; podgląd przed importem z dopasowaniem kolumn |
+| **Eksport do Excela** | Plik we wspólnym schemacie, z miniaturami grafik. Przycisk „Pusty szablon” daje ten sam układ bez treści, z filarami klienta |
+
+### Wspólny schemat pliku Excel (import i eksport)
+
+Ten sam plik można wyeksportować, poprawić w Excelu i zaimportować z powrotem. Układ odpowiada szablonowi
+„Harmonogram Publikacji”.
+
+| Zakładka | Zawartość |
+|---|---|
+| **`<Miesiąc rok>`**, np. „Czerwiec 2026” | Plan Facebook + Instagram: tytuł, kanał, linia „FILARY KOMUNIKACJI”, nagłówki, pasy „TYDZIEŃ n: DATA: … \| TEMAT: …”, treści, REZERWA, LEGENDA, STRUKTURA — FILARY KOMUNIKACJI, UWAGI OPERACYJNE |
+| **`LinkedIn – <Miesiąc rok>`** | Ten sam układ dla LinkedIna (osobny opis) |
+| **Opis filarów** | Wstęp „jak filary współgrają”, PROPORCJE I RYTM (zasady, ton, grupa docelowa, hashtagi), a dla każdego filara: opis, cel, grupa docelowa, co publikujemy, przykłady, czego unikać, rekomendacje |
+
+Kolumny planu: **A–K** jak w szablonie agencji – DATA, FORMAT, FILAR, TEMAT, OPIS POSTA (założenie), TREŚĆ POSTA
+(opis do publikacji), CTA, OZNACZENIA, HASZTAGI, MATERIAŁ — OPIS, MATERIAŁ — PLIKI / LINKI. **L–Q** (fioletowy
+nagłówek) to dane z planera: GODZINA, TEKST NA GRAFICE, DO POTWIERDZENIA, STATUS AKCEPTACJI, UWAGI KLIENTA, PUBLIKACJA.
+**R** (ukryta) to ID TREŚCI: wiersz z zakładki FB + IG i wiersz z zakładki LinkedIn o tym samym ID (albo tej samej
+dacie i temacie) stają się jedną treścią na obu kanałach. W kolumnie DATA zamiast daty można wpisać „W TYGODNIU”
+(dzień do ustalenia) albo „REZERWA”.
 | **Zespół** | Konta osób z agencji (administrator dodaje osoby, ustawia hasła, wyłącza konta) |
 | **Powiadomienia** | Dzwonek w menu: akceptacje, prośby o zmiany i komentarze klientów, licznik nieprzeczytanych osobno dla każdej osoby, sprawdzanie co 30 s, kliknięcie otwiera treść |
 
