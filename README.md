@@ -17,6 +17,7 @@ Jedno miejsce na plany treści wszystkich klientów: tabela jak w Excelu, kalend
 | **Import z Excela** | Rozpoznaje nasze plany (układ Lion i see, arkusz LinkedIn, „Opis filarów”), grafiki wklejone w arkusz, tygodnie, rezerwę i uwagi; podgląd przed importem z dopasowaniem kolumn |
 | **Eksport do Excela** | Plan w podobnym układzie: tygodnie, rezerwa, uwagi, miniatury grafik |
 | **Zespół** | Konta osób z agencji (administrator dodaje osoby, ustawia hasła, wyłącza konta) |
+| **Powiadomienia** | Dzwonek w menu: akceptacje, prośby o zmiany i komentarze klientów, licznik nieprzeczytanych osobno dla każdej osoby, sprawdzanie co 30 s, kliknięcie otwiera treść |
 
 Zmiany zapisują się same (stan widać na dole menu: „✓ Zapisano”). Jeśli klient zaakceptuje treść, gdy ktoś z zespołu
 ma ją otwartą, zapis nie nadpisze akceptacji – panel wczyta aktualną wersję i pokaże komunikat.

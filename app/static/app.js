@@ -41,6 +41,7 @@ const ICON = {
   comment: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l1-4.2A8 8 0 1 1 20 12z"/></svg>',
   send: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 3 10 14M21 3l-7 18-4-7-7-4z"/></svg>',
   save: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h12v18l-6-4-6 4z"/></svg>',
+  bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>',
 };
 const chIcons = p => `${p.meta ? ICON.ig + ICON.fb : ''}${p.li ? ICON.li : ''}`;
 const chLabel = p => [p.meta && 'FB + IG', p.li && 'LinkedIn'].filter(Boolean).join(' · ');
@@ -73,6 +74,7 @@ function toast(msg, ms = 2600) {
 // Panel klienta działa pod /p/<token> (bez logowania), panel agencji pod / (po zalogowaniu).
 const PORTAL_TOKEN = (location.pathname.match(/^\/p\/([a-f0-9]{24,64})\/?$/) || [])[1] || null;
 let me = null;  // zalogowana osoba z zespołu
+let notifs = { unread: 0, items: [], seenAt: 0 };  // powiadomienia od klientów (dzwonek)
 let state = { clients: [], posts: [], months: {} };
 
 async function api(method, url, body) {
@@ -176,7 +178,7 @@ async function reload(force) {
   await flush();
   if (pendingChanges()) return;
   const s = await api('GET', '/api/state');
-  me = s.user; applyServerState(s); snapshotAll(); render();
+  me = s.user; notifs = s.notifications || notifs; applyServerState(s); snapshotAll(); render();
 }
 window.addEventListener('beforeunload', e => { if (!PORTAL_TOKEN && pendingChanges()) { flush(); e.preventDefault(); e.returnValue = ''; } });
 
@@ -241,18 +243,19 @@ function viewSide(r) {
       ${avatar(c, 22)}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name)}</span>${n ? `<span class="cnt" title="Uwagi klienta / do poprawy">${n}</span>` : ''}</a>`;
   }).join('');
   return `<aside class="side">
-    <div class="brand"><div class="logo">✦</div>Planer treści</div>
+    <div class="brand"><a href="#/" aria-label="Pulpit"><img src="/static/logo-wizme-white.png" alt="WIZme"><span class="app">Planer treści</span></a><span class="grow"></span>
+      <button class="bell" data-act="notif" title="Powiadomienia od klientów">${ICON.bell}${notifs.unread ? `<span class="dot">${notifs.unread > 99 ? '99+' : notifs.unread}</span>` : ''}</button></div>
     <nav class="nav"><a href="#/" class="${r.name === 'dash' ? 'active' : ''}">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Pulpit</a></nav>
     <div class="nav-label">Klienci</div>
-    <div class="scroll"><nav class="nav">${clients || '<div class="small" style="padding:6px 10px;color:#7c8193">Brak klientów</div>'}</nav></div>
+    <div class="scroll"><nav class="nav">${clients || '<div class="small" style="padding:6px 12px;color:rgba(255,255,255,.5)">Brak klientów</div>'}</nav></div>
     <div class="foot">
       <button class="hi" data-act="import-xlsx">⤒ Importuj plan z Excela</button>
       <button data-act="new-client">＋ Dodaj klienta</button>
       ${me?.role === 'admin' ? '<button data-act="team">👥 Zespół</button>' : ''}
-      <div class="me"><span class="av" style="width:24px;height:24px;font-size:10px;background:#4f46e5">${esc(initials(me?.name))}</span>
-        <span class="who" title="${esc(me?.email)}">${esc(me?.name || '')}</span>
-        <button data-act="password" title="Zmień hasło">🔑</button><a href="/logout" title="Wyloguj">⎋</a></div>
+      <div class="me"><span class="av" style="width:34px;height:34px;font-size:14px;background:#5b3fb0">${esc(initials(me?.name))}</span>
+        <span class="who" title="${esc(me?.email)}"><b>${esc(me?.name || '')}</b><span>${me?.role === 'admin' ? 'Administrator' : 'Zespół'}</span></span>
+        <button data-act="password" title="Zmień hasło">🔑</button><a href="/logout" title="Wyloguj się">⎋</a></div>
       <div id="sync" class="sync" data-kind="ok">✓ Zapisano</div>
     </div>
   </aside>`;
@@ -1413,6 +1416,9 @@ document.addEventListener('click', async e => {
     case 'xlsx': exportXlsx(clientById(id)); break;
     case 'import-xlsx': { const [f] = await pickFiles('.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', false); if (f) startImport(f, el.dataset.client); break; }
     case 'do-import': doImport(); break;
+    case 'notif': if ($('#notif')) closeNotif(); else openNotif(); break;
+    case 'notif-close': closeNotif(); break;
+    case 'notif-open': openPostFromNotif(id); break;
     case 'team': openTeam(); break;
     case 'password': openPassword(); break;
     case 'user-add': addUser(); break;
@@ -1527,6 +1533,7 @@ document.addEventListener('change', e => {
 });
 
 document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && $('#notif')) { closeNotif(); return; }
   if (lb) {
     if (e.key === 'Escape') closeLb();
     else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { lb.i = Math.max(0, Math.min(lb.p.media.length - 1, lb.i + (e.key === 'ArrowLeft' ? -1 : 1))); renderLb(); }
@@ -1568,6 +1575,67 @@ document.addEventListener('dragend', () => { dragId = null; $$('.cal .d.over').f
 const quietReload = () => reload().catch(() => {});
 window.addEventListener('focus', quietReload);
 setInterval(() => { if (document.visibilityState === 'visible') quietReload(); }, 60000);
+
+/* ================= powiadomienia (dzwonek) ================= */
+const NOTIF_KIND = { accept: ['✓', 'Akceptacja'], changes: ['✎', 'Prośba o zmiany'], comment: ['💬', 'Komentarz'] };
+function fmtAgo(ts) {
+  const min = Math.round((Date.now() - ts) / 60000);
+  if (min < 1) return 'przed chwilą';
+  if (min < 60) return `${min} min temu`;
+  if (min < 24 * 60) return `${Math.round(min / 60)} godz. temu`;
+  return fmtTs(ts);
+}
+function updateBell() {
+  const b = $('.bell'); if (!b) return;
+  b.innerHTML = ICON.bell + (notifs.unread ? `<span class="dot">${notifs.unread > 99 ? '99+' : notifs.unread}</span>` : '');
+}
+let notifPrevSeen = 0;
+async function openNotif() {
+  notifPrevSeen = notifs.seenAt;  // to, co przyszło od ostatniego przeglądania, zostaje wyróżnione
+  renderNotif();
+  try { notifs = await api('POST', '/api/notifications/seen'); updateBell(); } catch { /* lista i tak jest widoczna */ }
+}
+function closeNotif() { $('#notif')?.remove(); }
+function renderNotif() {
+  let el = $('#notif');
+  if (!el) { el = document.createElement('div'); el.id = 'notif'; document.body.appendChild(el); }
+  const items = notifs.items.map(n => {
+    const p = state.posts.find(x => x.id === n.postId), c = clientById(n.clientId);
+    const [ic, label] = NOTIF_KIND[n.kind] || ['•', n.kind];
+    return `<div class="notif-it ${n.at > notifPrevSeen ? 'new' : ''}" data-act="notif-open" data-id="${esc(n.postId)}">
+      <span class="ic ${esc(n.kind)}">${ic}</span>
+      <div class="tx"><b>${label}</b> · ${esc(c?.name || 'klient')}<br>${esc(n.author)}${p ? ` – „${esc(p.title || 'Bez tematu')}”` : ''}
+        ${n.text ? `<q>${esc(n.text)}</q>` : ''}<div class="when">${fmtAgo(n.at)}</div></div></div>`;
+  }).join('');
+  el.innerHTML = `<div class="notif-overlay" data-act="notif-close"></div>
+    <div class="notif" role="dialog" aria-label="Powiadomienia"><div class="notif-h"><h3>Powiadomienia od klientów</h3><span class="grow"></span><button class="btn ghost icon" data-act="notif-close" title="Zamknij">✕</button></div>
+    <div class="notif-b">${items || '<div class="empty small">Na razie cisza. Tu pojawią się akceptacje, prośby o zmiany i komentarze klientów.</div>'}</div></div>`;
+}
+function openPostFromNotif(postId) {
+  closeNotif();
+  const p = state.posts.find(x => x.id === postId);
+  if (!p) { toast('Tej treści już nie ma w planie.'); return; }
+  ui.month = postMonth(p);
+  const target = `#/k/${p.clientId}/plan`;
+  if (location.hash !== target) location.hash = target; else render();
+  setTimeout(() => openDrawer(p, false), 60);
+}
+async function pollNotifs() {
+  if (PORTAL_TOKEN || !me) return;
+  try {
+    const prevTop = notifs.items[0]?.id ?? 0;
+    notifs = await api('GET', '/api/notifications');
+    updateBell();
+    const fresh = notifs.items.filter(n => n.id > prevTop);
+    if (prevTop && fresh.length) {
+      const n = fresh[0], c = clientById(n.clientId);
+      toast(`🔔 ${NOTIF_KIND[n.kind]?.[1] || 'Nowe zdarzenie'} – ${c?.name || 'klient'} (${n.author})${fresh.length > 1 ? ` i ${fresh.length - 1} więcej` : ''}`, 5000);
+      quietReload();
+    }
+    if ($('#notif')) renderNotif();
+  } catch { /* spróbujemy przy następnym sprawdzeniu */ }
+}
+setInterval(() => { if (document.visibilityState === 'visible') pollNotifs(); }, 30000);
 
 /* ================= zespół ================= */
 async function openTeam() {

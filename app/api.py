@@ -14,13 +14,13 @@ from typing import Any
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .auth import current_user, hash_password, require_admin, user_json, validate_password, verify_password
 from .config import settings
 from .db import get_db
-from .models import Client, Comment, Media, MonthPlan, Post, User
+from .models import Client, Comment, Media, MonthPlan, Notification, NotificationSeen, Post, User
 
 router = APIRouter()
 
@@ -72,7 +72,43 @@ def state(user: User = Depends(current_user), db: Session = Depends(get_db)):
         "clients": [client_json(c) for c in clients],
         "posts": [post_json(p, cm[p.id]) for p in posts],
         "months": [{**m.data, "clientId": m.client_id, "month": m.month} for m in months],
+        "notifications": notifications_for(db, user),
     }
+
+
+# ---------- powiadomienia (dzwonek) ----------
+
+NOTIF_LIMIT = 50
+
+
+def notifications_for(db: Session, user: User) -> dict:
+    seen = db.get(NotificationSeen, user.id)
+    seen_at = seen.seen_at if seen else 0
+    rows = db.scalars(select(Notification).order_by(Notification.at.desc()).limit(NOTIF_LIMIT)).all()
+    unread = db.scalar(select(func.count(Notification.id)).where(Notification.at > seen_at)) or 0
+    return {
+        "unread": unread,
+        "seenAt": seen_at,
+        "items": [{"id": n.id, "kind": n.kind, "author": n.author, "text": n.text, "at": n.at,
+                   "postId": n.post_id, "clientId": n.client_id} for n in rows],
+    }
+
+
+@router.get("/api/notifications")
+def notifications(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    return notifications_for(db, user)
+
+
+@router.post("/api/notifications/seen")
+def notifications_seen(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    row = db.get(NotificationSeen, user.id)
+    now = int(time.time() * 1000)
+    if row:
+        row.seen_at = now
+    else:
+        db.add(NotificationSeen(user_id=user.id, seen_at=now))
+    db.commit()
+    return notifications_for(db, user)
 
 
 class SyncBody(BaseModel):

@@ -72,6 +72,29 @@ class Comment(Base):
     at: Mapped[int] = mapped_column(BigInteger)  # milisekundy, jak Date.now() w przeglądarce
 
 
+class Notification(Base):
+    """Zdarzenie od klienta (akceptacja, prośba o zmiany, komentarz) – lista pod dzwonkiem w panelu."""
+
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), index=True)
+    post_id: Mapped[str] = mapped_column(ForeignKey("posts.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(10))  # accept / changes / comment
+    author: Mapped[str] = mapped_column(String(200), default="")
+    text: Mapped[str] = mapped_column(Text, default="")
+    at: Mapped[int] = mapped_column(BigInteger, index=True)  # milisekundy
+
+
+class NotificationSeen(Base):
+    """Do kiedy dana osoba przejrzała powiadomienia (osobna tabela, żeby nie zmieniać tabeli users)."""
+
+    __tablename__ = "notification_seen"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    seen_at: Mapped[int] = mapped_column(BigInteger, default=0)
+
+
 class Media(Base):
     """Wgrana grafika. Adres /media/<id> jest publiczny, ale identyfikator jest losowy i nie do zgadnięcia."""
 

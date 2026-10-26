@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from .api import TOKEN_RE, _check_id, comment_json, comments_by_post
 from .db import get_db
-from .models import Client, Comment, MonthPlan, Post
+from .models import Client, Comment, MonthPlan, Notification, Post
 
 router = APIRouter()
 
@@ -95,5 +95,6 @@ def portal_action(token: str, post_id: str, body: Action, db: Session = Depends(
         db.add(Comment(id=secrets.token_hex(8), post_id=p.id, role="sys", author=author, text="Poproszono o zmiany", at=now + 1))
     data["unread"] = True  # czerwona kropka w panelu agencji
     p.data, p.rev = data, p.rev + 1
+    db.add(Notification(client_id=c.id, post_id=p.id, kind=body.kind, author=author, text=text, at=now))
     db.commit()
     return public_post(p, comments_by_post(db, [p.id])[p.id])

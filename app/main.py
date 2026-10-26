@@ -1,6 +1,7 @@
 """Planer treści – aplikacja webowa (FastAPI)."""
 from __future__ import annotations
 
+import hashlib
 import html
 import logging
 from contextlib import asynccontextmanager
@@ -8,7 +9,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from fastapi import Depends, FastAPI, Form, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
@@ -71,8 +72,20 @@ def robots():
     return HTMLResponse("User-agent: *\nDisallow: /\n", media_type="text/plain")
 
 
-def _index() -> FileResponse:
-    return FileResponse(INDEX, headers={"Cache-Control": "no-cache"})
+def _versioned_index() -> str:
+    """index.html z numerem wersji przy app.js i app.css – po wdrożeniu przeglądarki pobiorą nowe pliki."""
+    page = INDEX.read_text(encoding="utf-8")
+    for name in ("app.js", "app.css"):
+        digest = hashlib.sha1((STATIC / name).read_bytes()).hexdigest()[:10]
+        page = page.replace(f"/static/{name}", f"/static/{name}?v={digest}")
+    return page
+
+
+_INDEX_HTML = _versioned_index()
+
+
+def _index() -> HTMLResponse:
+    return HTMLResponse(_INDEX_HTML, headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/")
@@ -92,10 +105,11 @@ LOGIN_PAGE = """<!doctype html>
 <title>Logowanie – Planer treści</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-body{{margin:0;min-height:100vh;display:grid;place-items:center;background:#f5f6f8;font-family:Inter,system-ui,sans-serif;color:#1b1f2a;padding:16px;box-sizing:border-box}}
-form{{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:28px;width:100%;max-width:360px;box-shadow:0 1px 3px rgba(16,24,40,.08)}}
-.brand{{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;margin-bottom:20px}}
-.logo{{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#6366f1,#ec4899);display:grid;place-items:center;color:#fff}}
+body{{margin:0;min-height:100vh;display:grid;place-items:center;background:linear-gradient(160deg,#7B4FD4 0%,#43337B 55%,#19172F 100%);font-family:Inter,system-ui,sans-serif;color:#0f172a;padding:16px;box-sizing:border-box}}
+form{{background:#fff;border-radius:16px;padding:30px 28px;width:100%;max-width:360px;box-shadow:0 20px 50px rgba(10,8,30,.35)}}
+.brand{{display:flex;align-items:center;gap:12px;margin-bottom:22px}}
+.brand img{{height:30px;width:auto}}
+.brand span{{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#64748b;border-left:1px solid #e5e7eb;padding-left:12px;line-height:1.2}}
 label{{display:block;font-size:12px;font-weight:600;color:#4b5563;margin:12px 0 5px}}
 input{{width:100%;box-sizing:border-box;border:1px solid #e5e7eb;border-radius:8px;padding:9px 11px;font:inherit}}
 input:focus{{outline:none;border-color:#a5b4fc;box-shadow:0 0 0 3px #e0e7ff}}
@@ -103,7 +117,7 @@ button{{margin-top:18px;width:100%;border:0;border-radius:8px;padding:10px;backg
 .err{{background:#fee2e2;color:#b91c1c;border-radius:8px;padding:8px 10px;font-size:13px;margin-bottom:6px}}
 </style></head><body>
 <form method="post" action="/login">
-<div class="brand"><div class="logo">✦</div>Planer treści</div>
+<div class="brand"><img src="/static/logo-wizme.png" alt="WIZme"><span>Planer<br>treści</span></div>
 {error}
 <label for="email">E-mail</label><input id="email" name="email" type="email" autocomplete="username" required value="{email}" autofocus>
 <label for="password">Hasło</label><input id="password" name="password" type="password" autocomplete="current-password" required>

@@ -120,6 +120,24 @@ def test_portal_actions(client):
     assert post["approval"] == "accepted" and post["unread"] is True and post["rev"] == 3
 
 
+def test_notifications_bell(client):
+    n = client.get("/api/notifications").json()
+    # akceptacja z poprzedniego testu jest pod dzwonkiem
+    assert n["unread"] == 1
+    item = n["items"][0]
+    assert item["kind"] == "accept" and item["author"] == "Anna Nowak" and item["postId"] == "post0001"
+    assert client.get("/api/state").json()["notifications"]["unread"] == 1
+    # po otwarciu dzwonka licznik się zeruje, a lista zostaje
+    seen = client.post("/api/notifications/seen").json()
+    assert seen["unread"] == 0 and len(seen["items"]) == 1
+    # kolejna uwaga klienta znowu podbija licznik
+    TestClient(app).post(f"/api/p/{TOKEN}/posts/post0001", json={"kind": "comment", "text": "Jeszcze jedno", "author": "Anna Nowak"})
+    n = client.get("/api/notifications").json()
+    assert n["unread"] == 1 and n["items"][0]["kind"] == "comment" and n["items"][0]["text"] == "Jeszcze jedno"
+    # licznik jest osobny dla każdej osoby z zespołu
+    assert TestClient(app).get("/api/notifications").status_code == 401
+
+
 def test_media_upload(client):
     r = client.post("/api/media", files={"file": ("a.png", PNG, "image/png")}, data={"name": "a.png"})
     assert r.status_code == 200
