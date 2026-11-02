@@ -53,6 +53,8 @@ ma ją otwartą, zapis nie nadpisze akceptacji – panel wczyta aktualną wersj�
      Tworzy się przy pierwszym starcie, gdy baza jest pusta. Później zmienne można usunąć, a hasło zmienić w panelu (🔑).
 5. **Settings → Networking → Custom Domain:** dodaj `social.wizme.pl` i u dostawcy DNS ustaw rekord CNAME wskazany przez Railway. Otwórz adres, zaloguj się i dodaj zespół w menu **Zespół**.
 
+Gdy w bazie nie ma żadnego klienta, aplikacja przy starcie tworzy przykładowego klienta „Kawiarnia Ziarno (demo)” (wyłącza to `DEMO_CLIENT=0`). Bez PostgreSQL dane są w pliku wewnątrz kontenera i znikają przy każdym wdrożeniu.
+
 Uruchamiaj w **jednej instancji** (ustawione w `railway.json`). Kopie zapasowe bazy (w tym grafik) robi Railway
 w usłudze PostgreSQL (**Backups**).
 
@@ -82,6 +84,7 @@ app/
   main.py      aplikacja: logowanie, strony, nagłówki bezpieczeństwa
   api.py       API panelu agencji: stan, zapis zmian (/api/sync), komentarze, grafiki, zespół
   portal.py    panel klienta /p/<token> – tylko dane widoczne dla klienta
+  demo.py      przykładowy klient przy pustej bazie
   auth.py      hasła (scrypt), sesja, konto administratora ze zmiennych
   models.py    tabele: users, clients, posts, month_plans, comments, media
   static/      interfejs (app.js, app.css, index.html)

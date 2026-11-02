@@ -18,6 +18,7 @@ from . import api, portal
 from .auth import authenticate, bootstrap_admin, login_blocked, login_failed
 from .config import settings
 from .db import get_db, init_db
+from .demo import seed_demo_client
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
@@ -29,6 +30,7 @@ INDEX = STATIC / "index.html"
 async def lifespan(_app: FastAPI):
     init_db()
     bootstrap_admin()
+    seed_demo_client()
     yield
 
 

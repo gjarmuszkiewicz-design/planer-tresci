@@ -10,6 +10,7 @@ os.environ["DATABASE_URL"] = f"sqlite:///{_db.name}"
 os.environ["ADMIN_EMAIL"] = "admin@agencja.pl"
 os.environ["ADMIN_PASSWORD"] = "tajne-haslo-1"
 os.environ["ADMIN_NAME"] = "Ania Admin"
+os.environ["DEMO_CLIENT"] = "0"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -181,3 +182,28 @@ def test_delete_client_cascades(client):
     state = client.get("/api/state").json()
     assert state["clients"] == [] and state["posts"] == [] and state["months"] == []
     assert TestClient(app).get(f"/api/p/{TOKEN}").status_code == 404
+
+
+def test_demo_client_seeded_only_into_empty_db(client, monkeypatch):
+    from sqlalchemy import delete
+
+    from app.config import settings
+    from app.db import SessionLocal
+    from app.demo import POSTS, seed_demo_client
+    from app.models import Client as ClientRow
+
+    with SessionLocal() as db:
+        db.execute(delete(ClientRow))
+        db.commit()
+    monkeypatch.setattr(settings, "demo_client", True)
+    seed_demo_client()
+    seed_demo_client()  # druga próba nic nie dodaje
+    login(client)
+    state = client.get("/api/state").json()
+    assert len(state["clients"]) == 1
+    assert len(state["posts"]) == len(POSTS)
+    assert len(state["notifications"]["items"]) == 2
+    token = state["clients"][0]["token"]
+    portal = client.get(f"/api/p/{token}").json()
+    assert all(p["approval"] != "draft" for p in portal["posts"])
+    assert "notes" not in portal["clients"][0]

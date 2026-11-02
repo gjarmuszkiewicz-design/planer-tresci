@@ -21,6 +21,8 @@ class Settings:
     admin_password = os.getenv("ADMIN_PASSWORD", "").strip()
     admin_name = os.getenv("ADMIN_NAME", "").strip() or "Administrator"
     max_upload_mb = int(os.getenv("MAX_UPLOAD_MB", "15"))
+    # przykładowy klient przy pustej bazie; DEMO_CLIENT=0 wyłącza
+    demo_client = os.getenv("DEMO_CLIENT", "1").strip() != "0"
 
 
 settings = Settings()
