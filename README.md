@@ -1,4 +1,4 @@
-# Planer treści – plan social media dla klientów agencji
+# WIZme Social – plan social media dla klientów agencji
 
 Jedno miejsce na plany treści wszystkich klientów: tabela jak w Excelu, kalendarz, podgląd postów jak w aplikacjach
 (Instagram, Facebook, LinkedIn) i link dla klienta do akceptacji. Bez tworzenia treści i bez automatycznej publikacji.
@@ -51,7 +51,7 @@ ma ją otwartą, zapis nie nadpisze akceptacji – panel wczyta aktualną wersj�
    - `COOKIE_SECURE=1`,
    - `ADMIN_EMAIL`, `ADMIN_PASSWORD` (min. 8 znaków), `ADMIN_NAME` – pierwsze konto administratora.
      Tworzy się przy pierwszym starcie, gdy baza jest pusta. Później zmienne można usunąć, a hasło zmienić w panelu (🔑).
-5. **Settings → Networking → Generate Domain**. Otwórz adres, zaloguj się i dodaj zespół w menu **Zespół**.
+5. **Settings → Networking → Custom Domain:** dodaj `social.wizme.pl` i u dostawcy DNS ustaw rekord CNAME wskazany przez Railway. Otwórz adres, zaloguj się i dodaj zespół w menu **Zespół**.
 
 Uruchamiaj w **jednej instancji** (ustawione w `railway.json`). Kopie zapasowe bazy (w tym grafik) robi Railway
 w usłudze PostgreSQL (**Backups**).

@@ -1,4 +1,4 @@
-"""Planer treści – aplikacja webowa (FastAPI)."""
+"""WIZme Social – aplikacja webowa (FastAPI)."""
 from __future__ import annotations
 
 import hashlib
@@ -32,7 +32,7 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title="Planer treści", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+app = FastAPI(title="WIZme Social", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
@@ -102,14 +102,14 @@ def client_panel(token: str):
 
 LOGIN_PAGE = """<!doctype html>
 <html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Logowanie – Planer treści</title>
+<title>Logowanie – WIZme Social</title>
+<link rel="icon" type="image/png" href="/static/favicon.png">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 body{{margin:0;min-height:100vh;display:grid;place-items:center;background:linear-gradient(160deg,#7B4FD4 0%,#43337B 55%,#19172F 100%);font-family:Inter,system-ui,sans-serif;color:#0f172a;padding:16px;box-sizing:border-box}}
 form{{background:#fff;border-radius:16px;padding:30px 28px;width:100%;max-width:360px;box-shadow:0 20px 50px rgba(10,8,30,.35)}}
 .brand{{display:flex;align-items:center;gap:12px;margin-bottom:22px}}
-.brand img{{height:30px;width:auto}}
-.brand span{{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#64748b;border-left:1px solid #e5e7eb;padding-left:12px;line-height:1.2}}
+.brand img{{height:36px;width:auto;max-width:100%}}
 label{{display:block;font-size:12px;font-weight:600;color:#4b5563;margin:12px 0 5px}}
 input{{width:100%;box-sizing:border-box;border:1px solid #e5e7eb;border-radius:8px;padding:9px 11px;font:inherit}}
 input:focus{{outline:none;border-color:#a5b4fc;box-shadow:0 0 0 3px #e0e7ff}}
@@ -117,7 +117,7 @@ button{{margin-top:18px;width:100%;border:0;border-radius:8px;padding:10px;backg
 .err{{background:#fee2e2;color:#b91c1c;border-radius:8px;padding:8px 10px;font-size:13px;margin-bottom:6px}}
 </style></head><body>
 <form method="post" action="/login">
-<div class="brand"><img src="/static/logo-wizme.png" alt="WIZme"><span>Planer<br>treści</span></div>
+<div class="brand"><img src="/static/logo-wizme-social.png" alt="WIZme Social"></div>
 {error}
 <label for="email">E-mail</label><input id="email" name="email" type="email" autocomplete="username" required value="{email}" autofocus>
 <label for="password">Hasło</label><input id="password" name="password" type="password" autocomplete="current-password" required>

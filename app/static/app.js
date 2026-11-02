@@ -225,7 +225,7 @@ window.addEventListener('hashchange', () => { closeDrawer(true); render(); windo
 
 function render() {
   const r = route();
-  document.title = 'Planer treści';
+  document.title = 'WIZme Social';
   if (r.name === 'portal') { $('#app').innerHTML = viewPortal(r.token); return; }
   let body;
   if (r.name === 'client') {
