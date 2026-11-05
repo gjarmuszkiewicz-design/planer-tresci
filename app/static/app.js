@@ -206,8 +206,11 @@ function newPost(o = {}) {
 }
 function newClient(o = {}) {
   return { id: uid(), token: newToken(), name: 'Nowy klient', color: '#4f46e5', avatar: '', igHandle: '', fbName: '', liName: '', liFollowers: '',
-    freq: '', tone: '', audience: '', strategy: '', pillars: [], hashtags: '', drive: '', contact: '', notes: '', ...o };
+    freq: '', tone: '', audience: '', strategy: '', strategyDoc: '', pillars: [], hashtags: '', drive: '', contact: '', notes: '', ...o };
 }
+
+// przycisk asystenta AI (ai.js) – pusty, gdy AI nie jest włączone
+const aiUi = (...a) => typeof aiBtn === 'function' ? aiBtn(...a) : '';
 
 /* ================= ui state ================= */
 const ui = { month: TODAY.slice(0, 7), ch: 'all', st: 'all', q: '', full: false, portalFilter: 'all', portalView: 'list' };
@@ -333,6 +336,7 @@ function viewClient(c, tab) {
       <div class="muted small row" style="gap:12px"><span class="ch">${ICON.ig}${ICON.fb} ${esc(c.igHandle ? '@' + c.igHandle : '—')}</span><span class="ch">${ICON.li} ${esc(c.liName || '—')}</span></div></div>
       <div class="grow"></div>
       <button class="btn" data-act="share" data-id="${c.id}">🔗 Link dla klienta</button>
+      ${aiUi(`data-ai="plan-open" data-client="${c.id}"`, 'Zaplanuj z AI')}
       <button class="btn primary" data-act="new-post" data-client="${c.id}">＋ Nowa treść</button></div>
     <div class="tabs">${tabs.map(([k, l]) => `<a href="#/k/${c.id}/${k}" class="${tab === k ? 'active' : ''}">${l}</a>`).join('')}</div>
     ${content}
@@ -532,9 +536,11 @@ function viewProfile(c) {
       <div class="two">${f('liName', 'Nazwa strony / profilu')}${f('liFollowers', 'Obserwujący (do podglądu)', 'np. 4 812')}</div>
       ${f('freq', 'Zasady i częstotliwość publikacji', 'np. dni robocze, 4 posty tygodniowo FB + IG', 'textarea')}
     </div></div>
-    <div class="card" style="grid-column:1/-1"><div class="card-h"><h3>Strategia</h3></div><div class="card-b">
+    <div class="card" style="grid-column:1/-1"><div class="card-h"><h3>Strategia</h3><span class="grow"></span>${aiUi('data-ai="strategy-pdf"', 'Wczytaj strategię z PDF', 'btn sm')}</div><div class="card-b">
       <div class="two">${f('tone', 'Ton komunikacji', 'np. bez długich myślników i list, emoji z umiarem', 'textarea')}<div>${f('audience', 'Grupa docelowa')}${f('hashtags', 'Stałe hashtagi', '#marka #branża')}</div></div>
       ${f('strategy', 'Jak filary współgrają', 'np. Filar 1 przyciąga uwagę, Filar 2 pokazuje ofertę, Filar 3 domyka decyzję zaufaniem', 'textarea')}
+      <div class="field"><label>Pełna strategia dla AI <span class="hint">· klient tego nie widzi</span></label>
+        <textarea class="input" data-cfield="strategyDoc" rows="8" placeholder="Cele, pozycjonowanie, oferta, kluczowe komunikaty, zakazy… Wklej strategię albo wczytaj ją z PDF – asystent AI opiera na niej plan i treści.">${esc(c.strategyDoc)}</textarea></div>
     </div></div>
     <div class="card" style="grid-column:1/-1"><div class="card-h"><h3>Filary komunikacji</h3><span class="small muted">· podpowiadane w edytorze, kolor widać w planie i kalendarzu</span><span class="grow"></span><button class="btn sm" data-act="pl-add">＋ Dodaj filar</button></div>
       <div class="card-b">${pillars || '<div class="small muted">Brak filarów. Dodaj je ręcznie albo zaimportuj z arkusza „Opis filarów”.</div>'}
@@ -832,7 +838,7 @@ function renderDrawer() {
         ${pl && (pl.goal || pl.what) ? `<div class="guide" style="margin:-4px 0 12px"><b>${esc(pl.name)}</b>${pl.goal ? ` · cel: ${esc(pl.goal)}` : ''}${pl.what ? `<br>Co publikujemy: ${esc(pl.what)}` : ''}</div>` : ''}
         <div class="field"><label>Założenie / opis pomysłu <span class="hint">· o czym jest post</span></label><textarea class="input" data-f="brief" rows="2" style="min-height:56px">${esc(d.brief)}</textarea></div>
 
-        <div class="sec">Treść</div>
+        <div class="sec">Treść${aiUi('data-ai="write-open"', d.copyMeta.trim() || d.copyLi.trim() ? 'Popraw z AI' : 'Napisz z AI', 'btn sm')}</div>
         <div class="captabs">
           ${d.meta ? `<button class="${drawer.cap === 'meta' ? 'on' : ''}" data-act="cap" data-v="meta"><span class="ch">${ICON.ig}${ICON.fb}</span>Opis FB + IG${!d.copyMeta.trim() ? '<span class="dot" title="pusty"></span>' : ''}</button>` : ''}
           ${d.li ? `<button class="${drawer.cap === 'li' ? 'on' : ''}" data-act="cap" data-v="li"><span class="ch">${ICON.li}</span>Opis LinkedIn${!d.copyLi.trim() ? '<span class="dot" title="pusty"></span>' : ''}</button>` : ''}

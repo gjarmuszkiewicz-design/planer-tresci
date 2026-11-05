@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import api, portal
+from . import ai, api, portal
 from .auth import authenticate, bootstrap_admin, current_user, login_blocked, login_failed
 from .config import settings
 from .db import get_db, init_db
@@ -64,6 +64,7 @@ app.add_middleware(
 )
 
 app.include_router(api.router)
+app.include_router(ai.router)
 app.include_router(portal.router)
 
 
@@ -89,7 +90,7 @@ def robots():
 def _versioned_index() -> str:
     """index.html z numerem wersji przy app.js i app.css – po wdrożeniu przeglądarki pobiorą nowe pliki."""
     page = INDEX.read_text(encoding="utf-8")
-    for name in ("app.js", "studio.js", "app.css"):
+    for name in ("app.js", "studio.js", "ai.js", "app.css"):
         digest = hashlib.sha1((STATIC / name).read_bytes()).hexdigest()[:10]
         page = page.replace(f"/static/{name}", f"/static/{name}?v={digest}")
     return page

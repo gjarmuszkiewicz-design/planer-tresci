@@ -16,6 +16,7 @@ Jedno miejsce na plany treści wszystkich klientów: tabela jak w Excelu, kalend
 | **Panel klienta** | Link `/p/<token>` bez logowania: plan z tematami tygodni, podgląd każdej treści, „Akceptuję” / „Poproś o zmiany”, komentarze. Serwer nie wysyła klientowi szkiców, notatek wewnętrznych ani ustawień agencji |
 | **Import z Excela** | Wspólny schemat (niżej) oraz starsze plany (układ Lion i see, arkusz LinkedIn, „Opis filarów”), grafiki wklejone w arkusz, tygodnie, rezerwę i uwagi; podgląd przed importem z dopasowaniem kolumn |
 | **Grafiki** | Tylko dla zespołu agencji (panel klienta nie ma dostępu). Projekty w systemie identyfikacji marki – na start WIZme: post, relacja / okładka rolki, grafika pozioma, okładka Facebooka, banery LinkedIn, awatar i okładki wyróżnionych relacji. Gotowe projekty i wzorce z systemu jako punkt wyjścia, przykładowe zdjęcia, kadr ustawiany przeciągnięciem, zapis projektów, pobranie PNG i dodanie grafiki do treści w planie |
+| **Asystent AI** | Tylko dla zespołu, działa po dodaniu klucza Claude API. „Zaplanuj z AI” układa tematy tygodni i treści na miesiąc ze strategii klienta (filary, ton, grupa, zasady, pełny dokument strategii), z uwzględnieniem tego, co już jest w planie i co było publikowane. Propozycje zaznaczasz i dodajesz jako szkice, opcjonalnie od razu z opisami. W edytorze treści „Napisz / Popraw z AI” pisze opisy FB + IG i LinkedIn, CTA, hashtagi, tekst na grafikę i brief dla grafika; wynik widać przed wstawieniem. W profilu „Wczytaj strategię z PDF” uzupełnia puste pola strategii i dodaje brakujące filary |
 | **Eksport do Excela** | Plik we wspólnym schemacie, z miniaturami grafik. Przycisk „Pusty szablon” daje ten sam układ bez treści, z filarami klienta |
 
 ### Wspólny schemat pliku Excel (import i eksport)
@@ -60,6 +61,8 @@ Nową markę dodaje się jako nowy katalog i wpis w `app/marki/marki.json`.
    - `COOKIE_SECURE=1`,
    - `ADMIN_EMAIL`, `ADMIN_PASSWORD` (min. 8 znaków), `ADMIN_NAME` – pierwsze konto administratora.
      Tworzy się przy pierwszym starcie, gdy baza jest pusta. Później zmienne można usunąć, a hasło zmienić w panelu (🔑).
+   - `ANTHROPIC_API_KEY` – klucz z console.anthropic.com, włącza asystenta AI (bez niego przyciski AI są ukryte).
+     Domyślny model to `claude-opus-5-5`; inny można ustawić zmienną `AI_MODEL`. Klucz zostaje na serwerze, przeglądarka go nie widzi.
 5. **Settings → Networking → Custom Domain:** dodaj `social.wizme.pl` i u dostawcy DNS ustaw rekord CNAME wskazany przez Railway. Otwórz adres, zaloguj się i dodaj zespół w menu **Zespół**.
 
 Gdy w bazie nie ma żadnego klienta, aplikacja przy starcie tworzy przykładowego klienta „Kawiarnia Ziarno (demo)” (wyłącza to `DEMO_CLIENT=0`). Bez PostgreSQL dane są w pliku wewnątrz kontenera i znikają przy każdym wdrożeniu.
@@ -84,7 +87,7 @@ uv run --python 3.12 --no-project --with-requirements requirements.txt --with py
 ```
 
 Testy sprawdzają logowanie, zapis planu, ochronę przed nadpisaniem akceptacji klienta, panel klienta (co klient widzi,
-a czego nie), akcje klienta, wgrywanie grafik, zarządzanie zespołem i blokadę żądań z obcych stron.
+a czego nie), akcje klienta, wgrywanie grafik, asystenta AI (na podstawionym modelu, bez kosztów API), zarządzanie zespołem i blokadę żądań z obcych stron.
 
 ## Struktura
 
@@ -92,12 +95,13 @@ a czego nie), akcje klienta, wgrywanie grafik, zarządzanie zespołem i blokadę
 app/
   main.py      aplikacja: logowanie, strony, nagłówki bezpieczeństwa
   api.py       API panelu agencji: stan, zapis zmian (/api/sync), komentarze, grafiki, zespół
+  ai.py        asystent AI (Claude API): plan miesiąca, pisanie treści, strategia z PDF
   portal.py    panel klienta /p/<token> – tylko dane widoczne dla klienta
   demo.py      przykładowy klient przy pustej bazie
   marki/       systemy identyfikacji marek dla modułu Grafiki (tylko po zalogowaniu)
   auth.py      hasła (scrypt), sesja, konto administratora ze zmiennych
   models.py    tabele: users, clients, posts, month_plans, comments, media, designs
-  static/      interfejs (app.js, studio.js – moduł Grafiki, app.css, index.html)
+  static/      interfejs (app.js, studio.js – moduł Grafiki, ai.js – asystent AI, app.css, index.html)
 tests/         testy przepływu
 ```
 

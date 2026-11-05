@@ -1,6 +1,7 @@
 """Testy całego przepływu: logowanie, zapis planu, konflikt wersji, panel klienta i jego ograniczenia."""
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 
@@ -168,6 +169,73 @@ def test_designs_and_brand_files_only_for_agency(client):
     assert client.put("/api/designs/proj0002", json={"brand": "Zła marka!", "data": {}}).status_code == 400
     assert client.delete("/api/designs/proj0001").status_code == 200
     assert client.get("/api/designs").json() == []
+
+
+def test_ai_assistant(client, monkeypatch):
+    from types import SimpleNamespace
+
+    from app import ai
+
+    anon = TestClient(app)
+    assert anon.post("/api/ai/plan", json={"clientId": "klient01", "month": "2026-10"}).status_code == 401
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    assert client.get("/api/ai/status").json()["enabled"] is False
+    assert client.post("/api/ai/plan", json={"clientId": "klient01", "month": "2026-10"}).status_code == 503
+
+    # podmieniony klient Claude: sprawdzamy, co wysyłamy, i zwracamy gotowy JSON
+    sent = {}
+    reply = {}
+
+    class Stream:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def get_final_message(self):
+            return SimpleNamespace(stop_reason="end_turn", content=[SimpleNamespace(type="text", text=json.dumps(reply))])
+
+    def stream(**kw):
+        sent.update(kw)
+        return Stream()
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test")
+    monkeypatch.setattr(ai, "_client", SimpleNamespace(beta=SimpleNamespace(messages=SimpleNamespace(stream=stream))))
+    client.post("/api/sync", json={"clients": [{"id": "klient01", "token": TOKEN, "name": "Kawiarnia", "notes": "TAJNE notatki agencji",
+                                                "strategyDoc": "TAJNA strategia: kawa speciality",
+                                                "pillars": [{"id": "p1", "name": "Produkt", "color": "#000", "goal": "sprzedaż"}]}]})
+
+    reply.update({"summary": "Plan", "weeks": [{"monday": "2026-10-05", "theme": "Kawa"}, {"monday": "1999-01-01", "theme": "x"}],
+                  "posts": [{"date": "2026-10-08", "meta": True, "li": True, "format": "Post", "pillar": "Produkt", "title": "Nowa kawa",
+                             "brief": "b", "materialBrief": "m", "toConfirm": ""},
+                            {"date": "2026-12-01", "meta": False, "li": False, "format": "Rolka", "pillar": "Nieistniejący", "title": "Poza miesiącem",
+                             "brief": "", "materialBrief": "", "toConfirm": ""}]})
+    r = client.post("/api/ai/plan", json={"clientId": "klient01", "month": "2026-10", "count": 2, "meta": True, "li": False})
+    assert r.status_code == 200, r.text
+    out = r.json()
+    assert out["weeks"] == {"2026-10-05": "Kawa"}
+    assert out["posts"][0]["li"] is False and out["posts"][0]["pillar"] == "Produkt"
+    assert out["posts"][1]["date"] == "" and out["posts"][1]["pillar"] == "" and out["posts"][1]["meta"] is True
+    assert sent["model"] == "claude-opus-5-5" and sent["output_config"]["format"]["type"] == "json_schema"
+    profile = sent["system"][1]["text"]
+    assert "TAJNA strategia" in profile and "Produkt" in profile and "Zmieniony" in sent["messages"][0]["content"][-1]["text"]
+
+    reply.clear()
+    reply.update({k: f"nowe {k}" for k in ai.WRITE_FIELDS})
+    r = client.post("/api/ai/write", json={"clientId": "klient01", "post": {"title": "Nowa kawa", "pillar": "Produkt", "meta": True}})
+    assert r.status_code == 200 and r.json()["copyMeta"] == "nowe copyMeta"
+    assert client.post("/api/ai/write", json={"clientId": "brak", "post": {}}).status_code == 404
+
+    assert client.post("/api/ai/strategy", files={"file": ("s.txt", b"tekst", "text/plain")}).status_code == 400
+    reply.clear()
+    reply.update({"summary": "S", "audience": "", "tone": "", "freq": "", "strategy": "", "hashtags": "", "pillars": []})
+    r = client.post("/api/ai/strategy", files={"file": ("s.pdf", b"%PDF-1.4 test", "application/pdf")})
+    assert r.status_code == 200 and r.json()["summary"] == "S"
+    assert sent["messages"][0]["content"][0]["type"] == "document"
+
+    # strategia i notatki nie trafiają do panelu klienta
+    assert "TAJNA" not in TestClient(app).get(f"/api/p/{TOKEN}").text
 
 
 def test_cross_site_post_blocked(client):
