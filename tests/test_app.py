@@ -148,6 +148,28 @@ def test_media_upload(client):
     assert client.post("/api/media", files={"file": ("a.txt", b"x", "text/plain")}).status_code == 400
 
 
+def test_designs_and_brand_files_only_for_agency(client):
+    anon = TestClient(app)
+    assert anon.get("/marki/wizme/marka.js").status_code == 401
+    assert anon.get("/marki/wizme/zdjecia/olaf.jpg").status_code == 401
+    assert anon.get("/api/designs").status_code == 401
+    assert anon.put("/api/designs/proj0001", json={"brand": "wizme", "data": {}}).status_code == 401
+
+    assert client.get("/marki/wizme/marka.js").status_code == 200
+    assert client.get("/marki/wizme/przyklady.json").json()["zbiory"]
+    assert client.get("/marki/../app/config.py").status_code == 404
+    assert client.get("/marki/%2e%2e/config.py").status_code == 404
+
+    r = client.put("/api/designs/proj0001", json={"brand": "wizme", "data": {"name": "Okładka", "format": "post", "typ": "tekst"}})
+    assert r.status_code == 200 and r.json()["name"] == "Okładka"
+    client.put("/api/designs/proj0001", json={"brand": "wizme", "data": {"name": "Okładka 2", "format": "story", "typ": "tekst"}})
+    items = client.get("/api/designs").json()
+    assert [(d["id"], d["name"], d["format"]) for d in items] == [("proj0001", "Okładka 2", "story")]
+    assert client.put("/api/designs/proj0002", json={"brand": "Zła marka!", "data": {}}).status_code == 400
+    assert client.delete("/api/designs/proj0001").status_code == 200
+    assert client.get("/api/designs").json() == []
+
+
 def test_cross_site_post_blocked(client):
     r = client.post("/api/sync", json={}, headers={"Origin": "https://zla-strona.pl"})
     assert r.status_code == 403

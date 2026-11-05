@@ -9,21 +9,24 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from fastapi import Depends, FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
 from . import api, portal
-from .auth import authenticate, bootstrap_admin, login_blocked, login_failed
+from .auth import authenticate, bootstrap_admin, current_user, login_blocked, login_failed
 from .config import settings
 from .db import get_db, init_db
+from .models import User
 from .demo import seed_demo_client
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 STATIC = Path(__file__).parent / "static"
 INDEX = STATIC / "index.html"
+# systemy identyfikacji marek (szablony, logo, zdjęcia przykładowe) – tylko dla zalogowanych, nie dla klientów
+MARKI = (Path(__file__).parent / "marki").resolve()
 
 
 @asynccontextmanager
@@ -69,6 +72,15 @@ def health():
     return {"ok": True}
 
 
+@app.get("/marki/{path:path}")
+def brand_file(path: str, _user: User = Depends(current_user)):
+    f = (MARKI / path).resolve()
+    if not f.is_relative_to(MARKI) or not f.is_file():
+        return JSONResponse({"detail": "Nie ma takiego pliku."}, status_code=404)
+    # no-cache: przeglądarka pyta o zmiany (szybka odpowiedź 304), więc poprawki systemu marki widać od razu po wdrożeniu
+    return FileResponse(f, headers={"Cache-Control": "private, no-cache"})
+
+
 @app.get("/robots.txt")
 def robots():
     return HTMLResponse("User-agent: *\nDisallow: /\n", media_type="text/plain")
@@ -77,7 +89,7 @@ def robots():
 def _versioned_index() -> str:
     """index.html z numerem wersji przy app.js i app.css – po wdrożeniu przeglądarki pobiorą nowe pliki."""
     page = INDEX.read_text(encoding="utf-8")
-    for name in ("app.js", "app.css"):
+    for name in ("app.js", "studio.js", "app.css"):
         digest = hashlib.sha1((STATIC / name).read_bytes()).hexdigest()[:10]
         page = page.replace(f"/static/{name}", f"/static/{name}?v={digest}")
     return page

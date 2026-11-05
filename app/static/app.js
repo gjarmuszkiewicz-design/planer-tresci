@@ -173,7 +173,8 @@ async function flush() {
 }
 async function reload(force) {
   // nie podmieniamy ekranu pod kimś, kto właśnie pisze albo ma otwarte okno
-  if (!force && (drawer || modalOpen || lb || document.activeElement?.matches('input,textarea,select'))) return;
+  // w module Grafiki odświeżenie przebudowałoby edytor razem z podglądem
+  if (!force && (drawer || modalOpen || lb || route().name === 'studio' || document.activeElement?.matches('input,textarea,select'))) return;
   if (PORTAL_TOKEN) { applyServerState(await api('GET', `/api/p/${PORTAL_TOKEN}`)); render(); return; }
   await flush();
   if (pendingChanges()) return;
@@ -219,6 +220,7 @@ function route() {
   if (PORTAL_TOKEN) return { name: 'portal', token: PORTAL_TOKEN };
   const h = location.hash.replace(/^#\/?/, '').split('/');
   if (h[0] === 'k' && h[1]) return { name: 'client', id: h[1], tab: h[2] || 'plan' };
+  if (h[0] === 'grafiki') return { name: 'studio', id: h[1] === 'p' ? h[2] : h[1] || '' };
   return { name: 'dash' };
 }
 window.addEventListener('hashchange', () => { closeDrawer(true); render(); window.scrollTo(0, 0); });
@@ -231,8 +233,10 @@ function render() {
   if (r.name === 'client') {
     const c = clientById(r.id);
     body = c ? viewClient(c, r.tab) : `<div class="container"><div class="empty"><b>Nie znaleziono klienta</b><a href="#/">Wróć do pulpitu</a></div></div>`;
-  } else body = viewDash();
+  } else if (r.name === 'studio') body = viewStudio(r);
+  else body = viewDash();
   $('#app').innerHTML = `<div class="shell">${viewSide(r)}<main class="main">${body}</main></div>`;
+  if (r.name === 'studio') studioMounted();
 }
 
 /* ================= sidebar ================= */
@@ -246,7 +250,9 @@ function viewSide(r) {
     <div class="brand"><a href="#/" aria-label="Pulpit"><img src="/static/logo-wizme-white.png" alt="WIZme"><span class="app">Planer treści</span></a><span class="grow"></span>
       <button class="bell" data-act="notif" title="Powiadomienia od klientów">${ICON.bell}${notifs.unread ? `<span class="dot">${notifs.unread > 99 ? '99+' : notifs.unread}</span>` : ''}</button></div>
     <nav class="nav"><a href="#/" class="${r.name === 'dash' ? 'active' : ''}">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Pulpit</a></nav>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Pulpit</a>
+      <a href="#/grafiki" class="${r.name === 'studio' ? 'active' : ''}">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="8.5" cy="8.5" r="1.8"/><path d="m21 15-5-5L5 21"/></svg>Grafiki</a></nav>
     <div class="nav-label">Klienci</div>
     <div class="scroll"><nav class="nav">${clients || '<div class="small" style="padding:6px 12px;color:rgba(255,255,255,.5)">Brak klientów</div>'}</nav></div>
     <div class="foot">

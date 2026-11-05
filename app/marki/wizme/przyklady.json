@@ -1,0 +1,757 @@
+{
+ "zbiory": [
+  {
+   "nazwa": "Karuzela: Marka to nie logo",
+   "projekty": [
+    {
+     "id": "a1",
+     "typ": "tekst",
+     "tlo": "noc",
+     "nad": "Budujemy",
+     "nr": "1/6",
+     "tytul": "MARKA TO|NIE *LOGO.*",
+     "rozmiar": 132,
+     "pod": "To obietnica, którą firma i jej ludzie dotrzymują każdego dnia.",
+     "prawa": "Przesuń dalej →",
+     "nazwa": "Okładka",
+     "format": "post"
+    },
+    {
+     "id": "a2",
+     "typ": "tekst",
+     "tlo": "biel",
+     "bezluku": false,
+     "nad": "Budujemy",
+     "nr": "2/6",
+     "tytul": "LOGO WIDZISZ.|OBIETNICĘ *SPRAWDZASZ.*",
+     "rozmiar": 78,
+     "tekst": "Klient wpisuje nazwisko prezesa w Google, czyta opinie i patrzy, jak firma odpowiada w komentarzach. Dopiero potem *decyduje, czy Wam zaufa.*",
+     "prawa": "Przesuń dalej →",
+     "nazwa": "Logo widzisz",
+     "format": "post"
+    },
+    {
+     "id": "a3",
+     "typ": "tekst",
+     "tlo": "noc",
+     "nad": "Budujemy",
+     "nr": "3/6",
+     "tytul": "ZANIM ZADZWONI,|*SPRAWDZI.*",
+     "rozmiar": 96,
+     "tekst": "Strona, profil, opinie. Klient ogląda je, zanim napisze do Ciebie choć słowo. *Jeśli każde miejsce mówi co innego, rozmowy może nie być.*",
+     "prawa": "Przesuń dalej →",
+     "nazwa": "Zanim zadzwoni",
+     "format": "post"
+    },
+    {
+     "id": "a4",
+     "typ": "tekst",
+     "tlo": "magenta",
+     "akcent": "noc2",
+     "nad": "Budujemy",
+     "nr": "4/6",
+     "tytul": "CO OBIECUJESZ?|KOMU?|*CZY TO WIDAĆ?*",
+     "rozmiar": 96,
+     "tekst": "Trzy pytania, od których warto zacząć każdą markę. Odpowiedź ma się zmieścić w jednym zdaniu.",
+     "prawa": "Przesuń dalej →",
+     "nazwa": "Trzy pytania",
+     "format": "post"
+    },
+    {
+     "id": "a5",
+     "typ": "tekst",
+     "tlo": "biel",
+     "nad": "Budujemy",
+     "nr": "5/6",
+     "tytul": "ZRÓB TO|*DZIŚ.*",
+     "rozmiar": 112,
+     "tekst": "Napisz swoją obietnicę jednym zdaniem. Potem otwórz stronę i profil firmy. *Mówią to samo?*",
+     "prawa": "Przesuń dalej →",
+     "nazwa": "Zrób to dziś",
+     "format": "post"
+    },
+    {
+     "id": "a6",
+     "typ": "tekst",
+     "tlo": "noc",
+     "nr": "6/6",
+     "tytul": "ZAPISZ NA PÓŹNIEJ.|ODBIERZ *RAPORT.*",
+     "rozmiar": 88,
+     "pod": "Bezpłatny raport w 24 h, link w bio.",
+     "prawa": "@wizme_pl",
+     "nazwa": "Koniec",
+     "format": "post"
+    }
+   ]
+  },
+  {
+   "nazwa": "Karuzela: Pracowaliśmy na meczu",
+   "projekty": [
+    {
+     "id": "b1",
+     "typ": "zdjecie",
+     "zdjecie": "kulisy-noc-bramka.jpg",
+     "kadr": "50% 38%",
+     "nad": "Tworzymy",
+     "nr": "1/5",
+     "tytul": "PRACOWALIŚMY|*NA MECZU*",
+     "rozmiar": 100,
+     "pod": "Warta Poznań, kulisy nagrań z Grupą Lion",
+     "nazwa": "Okładka",
+     "format": "post"
+    },
+    {
+     "id": "b2",
+     "typ": "split",
+     "tlo": "noc",
+     "zdjecie": "kulisy-s02.jpg",
+     "kadr": "50% 48%",
+     "styl": "height:1080px;",
+     "nr": "2/5",
+     "tytul": "KULISY NAGRAŃ|*Z GRUPĄ LION*",
+     "rozmiar": 76,
+     "nazwa": "Kulisy",
+     "format": "post"
+    },
+    {
+     "id": "b3",
+     "typ": "split",
+     "tlo": "noc",
+     "zdjecie": "kulisy-s15.jpg",
+     "kadr": "50% 42%",
+     "styl": "height:1080px;",
+     "nr": "3/5",
+     "tytul": "PRZYGOTOWANIA|*DO MECZU*",
+     "rozmiar": 76,
+     "nazwa": "Przygotowania",
+     "format": "post"
+    },
+    {
+     "id": "b4",
+     "typ": "split",
+     "tlo": "noc",
+     "zdjecie": "kulisy-foto-kibice.jpg",
+     "kadr": "50% 30%",
+     "styl": "height:1080px;",
+     "nr": "4/5",
+     "tytul": "KIBICE|*ZAPEŁNIAJĄ STADION*",
+     "rozmiar": 76,
+     "nazwa": "Kibice",
+     "format": "post"
+    },
+    {
+     "id": "b5",
+     "typ": "tekst",
+     "tlo": "noc",
+     "nr": "5/5",
+     "tytul": "DO OSTATNIEGO|*GWIZDKA.*",
+     "rozmiar": 96,
+     "pod": "Całe kulisy zobaczysz w rolce na profilu.",
+     "prawa": "@wizme_pl",
+     "nazwa": "Koniec",
+     "format": "post"
+    }
+   ]
+  },
+  {
+   "nazwa": "Karuzela: Co internet mówi o Tobie",
+   "projekty": [
+    {
+     "id": "c1",
+     "typ": "tekst",
+     "tlo": "magenta",
+     "akcent": "noc2",
+     "nad": "Chronimy",
+     "nr": "1/5",
+     "tytul": "CO INTERNET|MÓWI O TOBIE,|*ZANIM CIĘ*|*POZNA?*",
+     "rozmiar": 112,
+     "prawa": "Przesuń dalej →",
+     "nazwa": "Okładka",
+     "format": "post"
+    },
+    {
+     "id": "c2",
+     "typ": "tekst",
+     "tlo": "noc",
+     "nad": "Chronimy",
+     "nr": "2/5",
+     "tytul": "WPISZ SWOJE|*NAZWISKO.*",
+     "rozmiar": 104,
+     "tekst": "Otwórz okno prywatne przeglądarki. Tak zobaczysz wyniki bliższe temu, *co widzi ktoś obcy.*",
+     "prawa": "Przesuń dalej →",
+     "nazwa": "Wpisz nazwisko",
+     "format": "post"
+    },
+    {
+     "id": "c3",
+     "typ": "tekst",
+     "tlo": "biel",
+     "nad": "Chronimy",
+     "nr": "3/5",
+     "tytul": "SPRAWDŹ|*TRZY MIEJSCA.*",
+     "rozmiar": 96,
+     "tekst": "Pierwszą stronę wyników. Opinie o firmie i o Tobie. Zdjęcia, które pokazuje Google. *Czy to obraz, który chcesz pokazać?*",
+     "prawa": "Przesuń dalej →",
+     "nazwa": "Trzy miejsca",
+     "format": "post"
+    },
+    {
+     "id": "c4",
+     "typ": "tekst",
+     "tlo": "magenta",
+     "akcent": "noc2",
+     "nad": "Chronimy",
+     "nr": "4/5",
+     "tytul": "TRUDNA OPINIA?|*ODPOWIEDZ.*",
+     "rozmiar": 96,
+     "tekst": "Spokojnie i rzeczowo. Twoją odpowiedź przeczyta każdy kolejny klient, nie tylko autor opinii.",
+     "prawa": "Przesuń dalej →",
+     "nazwa": "Trudna opinia",
+     "format": "post"
+    },
+    {
+     "id": "c5",
+     "typ": "tekst",
+     "tlo": "noc",
+     "nr": "5/5",
+     "tytul": "CHCESZ WIEDZIEĆ,|*CO WIDAĆ?*",
+     "rozmiar": 88,
+     "pod": "Bezpłatny raport w 24 h, link w bio.",
+     "prawa": "@wizme_pl",
+     "nazwa": "Koniec",
+     "format": "post"
+    }
+   ]
+  },
+  {
+   "nazwa": "Osoba i firma",
+   "projekty": [
+    {
+     "id": "d1",
+     "typ": "osoba",
+     "zdjecie": "olaf.jpg",
+     "kadr": "50% 12%",
+     "nad": "Osoba + firma",
+     "nr": "1/2",
+     "tytul": "FIRMĘ WIDAĆ|*PRZEZ LUDZI*",
+     "imie": "Olaf Jarzemski",
+     "rola": "CEO WIZme",
+     "nazwa": "Olaf",
+     "format": "post"
+    },
+    {
+     "id": "d2",
+     "typ": "osoba",
+     "zdjecie": "katarzyna.jpg",
+     "kadr": "50% 12%",
+     "nad": "Osoba + firma",
+     "nr": "2/2",
+     "tytul": "ZACZYNAMY|*OD SIEBIE*",
+     "imie": "Katarzyna Jarzemska",
+     "rola": "CEO · Personal Brand Photographer",
+     "nazwa": "Katarzyna",
+     "format": "post"
+    }
+   ]
+  },
+  {
+   "nazwa": "Raport w 24 h: post i relacje",
+   "projekty": [
+    {
+     "id": "e1",
+     "typ": "liczba",
+     "tlo": "noc",
+     "nad": "Bezpłatny raport",
+     "liczba": "24 h",
+     "tytul": "I WIESZ, *CO WIDAĆ.*",
+     "rozmiar": 80,
+     "pod": "Sprawdzimy Twoją markę osobistą albo firmę.",
+     "prawa": "wizme.pl",
+     "nazwa": "Post",
+     "format": "post"
+    },
+    {
+     "id": "e2",
+     "format": "story",
+     "typ": "liczba",
+     "tlo": "noc",
+     "nad": "Bezpłatny raport",
+     "liczba": "24 h",
+     "tytul": "CO WIDAĆ,|GDY KTOŚ *CIĘ SZUKA?*",
+     "rozmiar": 80,
+     "prawa": "wizme.pl",
+     "nazwa": "Relacja"
+    },
+    {
+     "id": "e3",
+     "format": "story",
+     "typ": "tekst",
+     "tlo": "magenta",
+     "akcent": "noc2",
+     "nad": "Pytanie",
+     "tytul": "SPRAWDZASZ|SIEBIE|*W GOOGLE?*",
+     "rozmiar": 126,
+     "pod": "Odpowiedz w ankiecie.",
+     "nazwa": "Relacja pytanie"
+    }
+   ]
+  },
+  {
+   "nazwa": "Rolka: backstage z meczu",
+   "projekty": [
+    {
+     "id": "f1",
+     "format": "story",
+     "typ": "zdjecie",
+     "zdjecie": "kulisy-noc-bramka.jpg",
+     "kadr": "50% 50%",
+     "nad": "Backstage",
+     "tytul": "PRACOWALIŚMY|*NA MECZU*",
+     "rozmiar": 104,
+     "pod": "Kulisy nagrań z Grupą Lion",
+     "nazwa": "Okładka rolki"
+    },
+    {
+     "id": "f2",
+     "format": "story",
+     "typ": "tekst",
+     "tlo": "noc",
+     "tytul": "BUDUJEMY MARKI.|TWORZYMY *WIZERUNEK.*|CHRONIMY *REPUTACJĘ.*",
+     "rozmiar": 84,
+     "prawa": "wizme.pl",
+     "nazwa": "Plansza końcowa"
+    },
+    {
+     "id": "f3",
+     "format": "story",
+     "typ": "zdjecie",
+     "zdjecie": "kulisy-foto-kibice.jpg",
+     "kadr": "50% 50%",
+     "nad": "Nowa rolka",
+     "tytul": "JAK WYGLĄDA|*DZIEŃ MECZOWY*|OD ŚRODKA?",
+     "rozmiar": 92,
+     "pod": "Zobacz na profilu.",
+     "nazwa": "Relacja zapowiedź"
+    }
+   ]
+  },
+  {
+   "nazwa": "Rolka: strona dla architekta",
+   "projekty": [
+    {
+     "id": "g1",
+     "format": "story",
+     "typ": "ekran",
+     "tlo": "noc",
+     "zdjecie": "matgolon-strona-telefon.jpg",
+     "nad": "Tworzymy",
+     "tytul": "STRONA WWW|*DLA ARCHITEKTA*",
+     "rozmiar": 96,
+     "pod": "Mateusz Golon · matgolon.com",
+     "tw": 500,
+     "tt": 360,
+     "dolny": 270,
+     "nazwa": "Okładka ekran"
+    },
+    {
+     "id": "g2",
+     "format": "story",
+     "typ": "ekran",
+     "skos": true,
+     "tlo": "noc",
+     "zdjecie": "matgolon-strona-telefon.jpg",
+     "nad": "Tworzymy",
+     "tytul": "STRONA WWW|*DLA ARCHITEKTA*",
+     "rozmiar": 96,
+     "pod": "Mateusz Golon · matgolon.com",
+     "tw": 500,
+     "tt": 330,
+     "dolny": 270,
+     "nazwa": "Okładka ekran pod kątem"
+    },
+    {
+     "id": "g3",
+     "format": "story",
+     "typ": "zdjecie",
+     "zdjecie": "matgolon-portret.jpg",
+     "kadr": "50% 0",
+     "nad": "Tworzymy",
+     "tytul": "STRONA WWW|*DLA ARCHITEKTA*",
+     "rozmiar": 96,
+     "pod": "Mateusz Golon · matgolon.com",
+     "styl": "background-size:1400px auto;background-repeat:no-repeat;-webkit-mask-image:linear-gradient(to bottom,#000 48%,transparent 65%);",
+     "cien": "nisko",
+     "dolny": 280,
+     "nazwa": "Okładka zdjęcie"
+    }
+   ]
+  },
+  {
+   "nazwa": "Wzorce: zdjęcia z logo",
+   "projekty": [
+    {
+     "id": "z1",
+     "typ": "czyste",
+     "zdjecie": "olaf.jpg",
+     "kadr": "50% 15%",
+     "nazwa": "Zdjęcie czyste",
+     "format": "post"
+    },
+    {
+     "id": "z2",
+     "typ": "podpis",
+     "zdjecie": "katarzyna.jpg",
+     "kadr": "50% 20%",
+     "imie": "Katarzyna Jarzemska",
+     "rola": "CEO · Personal Brand Photographer",
+     "nazwa": "Zdjęcie z podpisem",
+     "format": "post"
+    },
+    {
+     "id": "z3",
+     "typ": "woda",
+     "zdjecie": "szut.jpg",
+     "kadr": "60% 30%",
+     "nazwa": "Zdjęcie znak wodny",
+     "format": "post"
+    },
+    {
+     "id": "z4",
+     "typ": "znak",
+     "zdjecie": "kulisy-noc-bramka.jpg",
+     "kadr": "50% 42%",
+     "nazwa": "Zdjęcie duże logo",
+     "format": "post"
+    }
+   ]
+  },
+  {
+   "nazwa": "Wzorce: posty i karuzele",
+   "projekty": [
+    {
+     "id": "t1",
+     "typ": "tekst",
+     "tlo": "noc",
+     "tytul": "BUDUJEMY MARKI.|TWORZYMY *WIZERUNEK.*|CHRONIMY *REPUTACJĘ.*",
+     "rozmiar": 86,
+     "pod": "Pracujemy z człowiekiem i jego firmą jednocześnie.",
+     "nazwa": "Manifest",
+     "format": "post"
+    },
+    {
+     "id": "t2",
+     "typ": "tekst",
+     "tlo": "noc",
+     "nad": "Budujemy",
+     "nr": "1/6",
+     "tytul": "MARKA TO|NIE *LOGO.*",
+     "rozmiar": 132,
+     "pod": "To obietnica, którą firma i jej ludzie dotrzymują każdego dnia.",
+     "prawa": "Przesuń dalej →",
+     "nazwa": "Karuzela okładka",
+     "format": "post"
+    },
+    {
+     "id": "t3",
+     "typ": "tekst",
+     "tlo": "biel",
+     "bezluku": false,
+     "nad": "Budujemy",
+     "nr": "2/6",
+     "tytul": "LOGO WIDZISZ.|OBIETNICĘ *SPRAWDZASZ.*",
+     "rozmiar": 78,
+     "tekst": "Klient wpisuje nazwisko prezesa w Google, czyta opinie i patrzy, jak firma odpowiada w komentarzach. Dopiero potem *decyduje, czy Wam zaufa.*",
+     "prawa": "Przesuń dalej →",
+     "nazwa": "Karuzela slajd",
+     "format": "post"
+    },
+    {
+     "id": "t4",
+     "typ": "zdjecie",
+     "zdjecie": "kulisy-noc-bramka.jpg",
+     "kadr": "50% 38%",
+     "nad": "Tworzymy",
+     "nr": "1/5",
+     "tytul": "DZIEŃ MECZOWY|*WARTA POZNAŃ*",
+     "rozmiar": 92,
+     "pod": "Kulisy nagrań z Grupą Lion",
+     "nazwa": "Realizacja okładka",
+     "format": "post"
+    },
+    {
+     "id": "t5",
+     "typ": "split",
+     "tlo": "noc",
+     "zdjecie": "kulisy-s02.jpg",
+     "kadr": "50% 48%",
+     "styl": "height:1010px;",
+     "nr": "2/5",
+     "tytul": "KULISY NAGRAŃ|*Z GRUPĄ LION*",
+     "pod": "Mecz Warty Poznań, nagrania od przygotowań do gwizdka.",
+     "nazwa": "Realizacja slajd",
+     "format": "post"
+    },
+    {
+     "id": "t6",
+     "typ": "osoba",
+     "zdjecie": "kikut.jpg",
+     "kadr": "100% 16%",
+     "nad": "Osoba + firma",
+     "tytul": "PO KARIERZE|ZOSTAJE *MARKA*",
+     "imie": "Marcin Kikut",
+     "rola": "Klient WIZme",
+     "styl": "background-size:2250px auto;",
+     "nazwa": "Osoba i firma",
+     "format": "post"
+    },
+    {
+     "id": "t7",
+     "typ": "tekst",
+     "tlo": "magenta",
+     "akcent": "noc2",
+     "nad": "Chronimy",
+     "nr": "1/5",
+     "tytul": "CO INTERNET|MÓWI O TOBIE,|*ZANIM CIĘ*|*POZNA?*",
+     "rozmiar": 112,
+     "prawa": "Przesuń dalej →",
+     "nazwa": "Chronimy okładka",
+     "format": "post"
+    },
+    {
+     "id": "t8",
+     "typ": "liczba",
+     "tlo": "noc",
+     "nad": "Bezpłatny raport",
+     "liczba": "24 h",
+     "tytul": "I WIESZ, *CO WIDAĆ.*",
+     "rozmiar": 80,
+     "pod": "Sprawdzimy Twoją markę osobistą albo firmę.",
+     "prawa": "wizme.pl",
+     "nazwa": "Raport 24 h",
+     "format": "post"
+    },
+    {
+     "id": "t9",
+     "typ": "tekst",
+     "tlo": "noc",
+     "nr": "6/6",
+     "tytul": "ZAPISZ NA PÓŹNIEJ.|ODBIERZ *RAPORT.*",
+     "rozmiar": 88,
+     "pod": "Bezpłatny raport w 24 h, link w bio.",
+     "prawa": "@wizme_pl",
+     "nazwa": "Koniec karuzeli",
+     "format": "post"
+    },
+    {
+     "id": "t10",
+     "typ": "logo",
+     "tlo": "noc",
+     "nazwa": "Logo",
+     "format": "post"
+    }
+   ]
+  },
+  {
+   "nazwa": "Wzorce: relacje",
+   "projekty": [
+    {
+     "id": "s1",
+     "format": "story",
+     "typ": "liczba",
+     "tlo": "noc",
+     "nad": "Bezpłatny raport",
+     "liczba": "24 h",
+     "tytul": "CO WIDAĆ,|GDY KTOŚ *CIĘ SZUKA?*",
+     "rozmiar": 80,
+     "prawa": "wizme.pl",
+     "nazwa": "Relacja raport"
+    },
+    {
+     "id": "s2",
+     "format": "story",
+     "typ": "zdjecie",
+     "zdjecie": "kulisy-foto-kibice.jpg",
+     "kadr": "50% 50%",
+     "nad": "Backstage",
+     "tytul": "JAK PRACUJE|*EKIPA WIZme*",
+     "rozmiar": 100,
+     "nazwa": "Relacja kulisy"
+    },
+    {
+     "id": "s3",
+     "format": "story",
+     "typ": "tekst",
+     "tlo": "magenta",
+     "akcent": "noc2",
+     "nad": "Pytanie",
+     "tytul": "SPRAWDZASZ|SIEBIE|*W GOOGLE?*",
+     "rozmiar": 126,
+     "pod": "Odpowiedz w ankiecie.",
+     "nazwa": "Relacja pytanie"
+    }
+   ]
+  },
+  {
+   "nazwa": "Wzorce: rolki",
+   "projekty": [
+    {
+     "id": "v1",
+     "format": "story",
+     "typ": "zdjecie",
+     "zdjecie": "kulisy-noc-bramka.jpg",
+     "kadr": "50% 50%",
+     "nad": "Backstage",
+     "tytul": "DZIEŃ|MECZOWY|*WARTA POZNAŃ*",
+     "rozmiar": 100,
+     "pod": "Kulisy nagrań z Grupą Lion",
+     "nazwa": "Okładka rolki"
+    },
+    {
+     "id": "v2",
+     "format": "story",
+     "typ": "tekst",
+     "tlo": "noc",
+     "tytul": "BUDUJEMY MARKI.|TWORZYMY *WIZERUNEK.*|CHRONIMY *REPUTACJĘ.*",
+     "rozmiar": 84,
+     "prawa": "wizme.pl",
+     "nazwa": "Plansza końcowa"
+    }
+   ]
+  },
+  {
+   "nazwa": "Wzorce: grafiki poziome",
+   "projekty": [
+    {
+     "id": "w1",
+     "format": "poziom",
+     "tlo": "noc",
+     "zdjecie": "zespol.jpg",
+     "kadr": "60% 50%",
+     "tytul": "BUDUJEMY MARKI.|TWORZYMY *WIZERUNEK.*|CHRONIMY *REPUTACJĘ.*",
+     "rozmiar": 46,
+     "pod": "Agencja marketingu i wizerunku, Poznań",
+     "nazwa": "Poziom: LinkedIn"
+    },
+    {
+     "id": "w2",
+     "format": "poziom",
+     "tlo": "noc",
+     "zdjecie": "kulisy-noc-bramka.jpg",
+     "kadr": "50% 42%",
+     "nad": "Tworzymy",
+     "tytul": "DZIEŃ MECZOWY|*WARTA POZNAŃ*",
+     "rozmiar": 54,
+     "pod": "Kulisy nagrań z Grupą Lion",
+     "nazwa": "Poziom: realizacja"
+    }
+   ]
+  },
+  {
+   "nazwa": "Wzorce: awatar i banery",
+   "projekty": [
+    {
+     "id": "p1",
+     "format": "kwadrat",
+     "typ": "awatar",
+     "tlo": "noc",
+     "nazwa": "Awatar"
+    },
+    {
+     "id": "p2",
+     "format": "lifirma",
+     "typ": "baner",
+     "tlo": "noc",
+     "logo": 560,
+     "lewo": 640,
+     "tytul": "BUDUJEMY MARKI.|TWORZYMY *WIZERUNEK.*|CHRONIMY *REPUTACJĘ.*",
+     "rozmiar": 66,
+     "odstep": 80,
+     "nazwa": "Baner LinkedIn firma"
+    },
+    {
+     "id": "p3",
+     "format": "liosoba",
+     "typ": "baner",
+     "tlo": "noc",
+     "logo": 300,
+     "lewo": 520,
+     "odstep": 50,
+     "tytul": "BUDUJEMY MARKI.|TWORZYMY *WIZERUNEK.*|CHRONIMY *REPUTACJĘ.*",
+     "rozmiar": 44,
+     "nazwa": "Baner LinkedIn osoba"
+    },
+    {
+     "id": "p4",
+     "format": "fb",
+     "typ": "baner",
+     "tlo": "noc",
+     "logo": 440,
+     "lewo": 120,
+     "odstep": 80,
+     "tytul": "BUDUJEMY MARKI.|TWORZYMY *WIZERUNEK.*|CHRONIMY *REPUTACJĘ.*",
+     "rozmiar": 66,
+     "nazwa": "Okładka Facebook"
+    }
+   ]
+  },
+  {
+   "nazwa": "Wzorce: okładki wyróżnionych relacji",
+   "projekty": [
+    {
+     "id": "h1",
+     "format": "kwadrat",
+     "typ": "wyroznione",
+     "tlo": "noc",
+     "tytul": "Realizacje",
+     "nazwa": "Wyróżnione realizacje"
+    },
+    {
+     "id": "h2",
+     "format": "kwadrat",
+     "typ": "wyroznione",
+     "tlo": "noc",
+     "tytul": "Kulisy",
+     "nazwa": "Wyróżnione kulisy"
+    },
+    {
+     "id": "h3",
+     "format": "kwadrat",
+     "typ": "wyroznione",
+     "tlo": "magenta",
+     "tytul": "Raport",
+     "nazwa": "Wyróżnione raport"
+    },
+    {
+     "id": "h4",
+     "format": "kwadrat",
+     "typ": "wyroznione",
+     "tlo": "noc",
+     "tytul": "Zespół",
+     "nazwa": "Wyróżnione zespół"
+    }
+   ]
+  }
+ ],
+ "zdjecia": [
+  "katarzyna.jpg",
+  "kikut.jpg",
+  "kowalewska.jpg",
+  "kulisy-foto-kibice.jpg",
+  "kulisy-noc-bramka.jpg",
+  "kulisy-s02.jpg",
+  "kulisy-s05.jpg",
+  "kulisy-s09.jpg",
+  "kulisy-s14.jpg",
+  "kulisy-s15.jpg",
+  "kulisy-s16.jpg",
+  "lion-tablica.jpg",
+  "lion-trybuna.jpg",
+  "matgolon-portret-duzy.jpg",
+  "matgolon-portret.jpg",
+  "matgolon-strona-telefon.jpg",
+  "olaf.jpg",
+  "strzyzewski.jpg",
+  "szut.jpg",
+  "zespol.jpg"
+ ]
+}

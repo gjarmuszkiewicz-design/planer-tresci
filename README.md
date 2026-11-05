@@ -15,6 +15,7 @@ Jedno miejsce na plany treści wszystkich klientów: tabela jak w Excelu, kalend
 | **Profil klienta** | Konta, zasady publikacji, ton, stałe hashtagi, filary z opisem (cel, grupa, co publikujemy, przykłady) |
 | **Panel klienta** | Link `/p/<token>` bez logowania: plan z tematami tygodni, podgląd każdej treści, „Akceptuję” / „Poproś o zmiany”, komentarze. Serwer nie wysyła klientowi szkiców, notatek wewnętrznych ani ustawień agencji |
 | **Import z Excela** | Wspólny schemat (niżej) oraz starsze plany (układ Lion i see, arkusz LinkedIn, „Opis filarów”), grafiki wklejone w arkusz, tygodnie, rezerwę i uwagi; podgląd przed importem z dopasowaniem kolumn |
+| **Grafiki** | Tylko dla zespołu agencji (panel klienta nie ma dostępu). Projekty w systemie identyfikacji marki – na start WIZme: post, relacja / okładka rolki, grafika pozioma, okładka Facebooka, banery LinkedIn, awatar i okładki wyróżnionych relacji. Gotowe projekty i wzorce z systemu jako punkt wyjścia, przykładowe zdjęcia, kadr ustawiany przeciągnięciem, zapis projektów, pobranie PNG i dodanie grafiki do treści w planie |
 | **Eksport do Excela** | Plik we wspólnym schemacie, z miniaturami grafik. Przycisk „Pusty szablon” daje ten sam układ bez treści, z filarami klienta |
 
 ### Wspólny schemat pliku Excel (import i eksport)
@@ -39,6 +40,14 @@ dacie i temacie) stają się jedną treścią na obu kanałach. W kolumnie DATA 
 
 Zmiany zapisują się same (stan widać na dole menu: „✓ Zapisano”). Jeśli klient zaakceptuje treść, gdy ktoś z zespołu
 ma ją otwartą, zapis nie nadpisze akceptacji – panel wczyta aktualną wersję i pokaże komunikat.
+
+### Moduł Grafiki i systemy identyfikacji marek
+
+Każda marka to katalog `app/marki/<id>/` z plikiem `marka.js` (formaty, szablony HTML/CSS, pola edytora), logo i sygnetem w SVG,
+przykładowymi zdjęciami i listą gotowych projektów (`przyklady.json`). Pliki są dostępne tylko po zalogowaniu (`/marki/...`).
+Szablony WIZme przeniesiono 1:1 z generatora `system-social-wizme/generuj.js`, a gotowe projekty z jego `posty.json`.
+Grafika powstaje w przeglądarce (ramka z kodem marki + biblioteka html-to-image), więc serwer nie potrzebuje Chrome.
+Nową markę dodaje się jako nowy katalog i wpis w `app/marki/marki.json`.
 
 ## Wdrożenie na Railway
 
@@ -85,9 +94,10 @@ app/
   api.py       API panelu agencji: stan, zapis zmian (/api/sync), komentarze, grafiki, zespół
   portal.py    panel klienta /p/<token> – tylko dane widoczne dla klienta
   demo.py      przykładowy klient przy pustej bazie
+  marki/       systemy identyfikacji marek dla modułu Grafiki (tylko po zalogowaniu)
   auth.py      hasła (scrypt), sesja, konto administratora ze zmiennych
-  models.py    tabele: users, clients, posts, month_plans, comments, media
-  static/      interfejs (app.js, app.css, index.html)
+  models.py    tabele: users, clients, posts, month_plans, comments, media, designs
+  static/      interfejs (app.js, studio.js – moduł Grafiki, app.css, index.html)
 tests/         testy przepływu
 ```
 

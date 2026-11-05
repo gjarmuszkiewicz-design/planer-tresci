@@ -6,6 +6,7 @@ serwer odrzuca starszą wersję i odsyła aktualną, zamiast po cichu ją nadpis
 """
 from __future__ import annotations
 
+import json
 import re
 import secrets
 import time
@@ -20,7 +21,7 @@ from sqlalchemy.orm import Session
 from .auth import current_user, hash_password, require_admin, user_json, validate_password, verify_password
 from .config import settings
 from .db import get_db
-from .models import Client, Comment, Media, MonthPlan, Notification, NotificationSeen, Post, User
+from .models import Client, Comment, Design, Media, MonthPlan, Notification, NotificationSeen, Post, User
 
 router = APIRouter()
 
@@ -236,6 +237,52 @@ def get_media(media_id: str, db: Session = Depends(get_db)):
         raise HTTPException(404, "Nie ma takiego pliku.")
     return Response(m.data, media_type=m.content_type,
                     headers={"Cache-Control": "public, max-age=31536000, immutable"})
+
+
+# ---------- grafiki (projekty w systemie identyfikacji marki) ----------
+
+BRAND_RE = re.compile(r"^[a-z0-9-]{2,40}$")
+
+
+class DesignBody(BaseModel):
+    brand: str
+    data: dict[str, Any]
+
+
+def design_json(d: Design) -> dict:
+    return {**d.data, "id": d.id, "brand": d.brand, "updatedAt": int(d.updated_at.timestamp() * 1000)}
+
+
+@router.get("/api/designs")
+def list_designs(_user: User = Depends(current_user), db: Session = Depends(get_db)):
+    return [design_json(d) for d in db.scalars(select(Design).order_by(Design.updated_at.desc()))]
+
+
+@router.put("/api/designs/{design_id}")
+def save_design(design_id: str, body: DesignBody, _user: User = Depends(current_user), db: Session = Depends(get_db)):
+    if not BRAND_RE.match(body.brand):
+        raise HTTPException(400, "Niepoprawna marka.")
+    if len(json.dumps(body.data)) > 200_000:
+        raise HTTPException(413, "Projekt jest za duży.")
+    data = {k: v for k, v in body.data.items() if k not in ("id", "brand", "updatedAt")}
+    d = db.get(Design, _check_id(design_id))
+    if d:
+        d.brand, d.data = body.brand, data
+    else:
+        d = Design(id=design_id, brand=body.brand, data=data)
+        db.add(d)
+    db.commit()
+    db.refresh(d)
+    return design_json(d)
+
+
+@router.delete("/api/designs/{design_id}")
+def delete_design(design_id: str, _user: User = Depends(current_user), db: Session = Depends(get_db)):
+    d = db.get(Design, _check_id(design_id))
+    if d:
+        db.delete(d)
+        db.commit()
+    return {"ok": True}
 
 
 # ---------- zespół ----------

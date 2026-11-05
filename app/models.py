@@ -95,6 +95,17 @@ class NotificationSeen(Base):
     seen_at: Mapped[int] = mapped_column(BigInteger, default=0)
 
 
+class Design(Base):
+    """Projekt grafiki z modułu Grafiki (tylko agencja): marka, format, szablon i treść pól w JSON."""
+
+    __tablename__ = "designs"
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    brand: Mapped[str] = mapped_column(String(40), index=True)
+    data: Mapped[dict] = mapped_column(JSON, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+
 class Media(Base):
     """Wgrana grafika. Adres /media/<id> jest publiczny, ale identyfikator jest losowy i nie do zgadnięcia."""
 
