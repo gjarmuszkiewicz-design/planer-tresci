@@ -231,6 +231,7 @@ table.plan.full{min-width:2100px}
 .drawer-b{flex:1;display:grid;grid-template-columns:1fr 430px;min-height:0}
 .drawer-b .form{overflow:auto;padding:20px 22px;background:#fff;border-right:1px solid var(--border)}
 .drawer-b .pv{overflow:auto;padding:20px;display:flex;flex-direction:column;align-items:center;gap:14px}
+.drawer-b .pv>*{flex-shrink:0}
 .drawer-f{display:flex;gap:8px;padding:12px 20px;background:#fff;border-top:1px solid var(--border)}
 .sec{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:650;margin:20px 0 10px;display:flex;align-items:center;gap:8px}
 .sec:first-child{margin-top:0}
