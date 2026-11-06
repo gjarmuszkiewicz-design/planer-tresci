@@ -485,3 +485,13 @@ table.plan.full{min-width:2100px}
 .chip.tbd .t{font-style:italic}
 .cal .wkbar .wk-in{max-width:420px;padding:2px 8px;font-size:12px}
 .cal .wkbar .wk-n{margin-left:auto}
+.cpy{display:inline-flex;align-items:center;justify-content:center;width:24px;height:22px;margin-left:4px;padding:0;border:1px solid transparent;border-radius:6px;background:none;color:#6b7280;cursor:pointer;vertical-align:middle}
+.cpy svg{width:14px;height:14px}
+.cpy:hover{background:#f3f4f8;border-color:var(--border);color:#111827}
+.cpy.ok{color:#059669;border-color:#a7f3d0;background:#ecfdf5}
+.field>label .cpy{margin-left:auto}
+.cpy.txt{width:auto;gap:4px;padding:0 7px;font-size:12px;font-weight:500}
+.captabs .cpy{padding:0;margin:auto 0 auto 2px;border:1px solid transparent;color:#6b7280;font-weight:500}
+.captabs .cpy.txt{padding:0 7px}
+.captabs .cpy:hover{border-color:var(--border);color:#111827}
+.captabs .cpy.ok{color:#059669;border-color:#a7f3d0}

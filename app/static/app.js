@@ -37,6 +37,7 @@ const ICON = {
   ig: '<svg viewBox="0 0 24 24" fill="none" stroke="#d62976" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#d62976"/></svg>',
   fb: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#1877f2"/><path d="M13.2 19v-6h2l.3-2.4h-2.3V9.2c0-.7.2-1.2 1.2-1.2h1.2V5.9a16 16 0 0 0-1.8-.1c-1.8 0-3 1.1-3 3.1v1.7h-2V13h2v6z" fill="#fff"/></svg>',
   li: '<svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="4" fill="#0a66c2"/><path d="M7 10h2.2v7H7zM8.1 6.5a1.3 1.3 0 1 1 0 2.6 1.3 1.3 0 0 1 0-2.6zM10.8 10h2.1v1c.3-.6 1.1-1.2 2.2-1.2 2.3 0 2.7 1.5 2.7 3.4V17h-2.2v-3.4c0-.8 0-1.9-1.2-1.9s-1.4.9-1.4 1.8V17h-2.2z" fill="#fff"/></svg>',
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>',
   heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>',
   comment: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l1-4.2A8 8 0 1 1 20 12z"/></svg>',
   send: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 3 10 14M21 3l-7 18-4-7-7-4z"/></svg>',
@@ -191,6 +192,8 @@ const postWeek = p => p.date ? mondayOf(p.date) : (p.week || '');
 const sortKey = p => (p.date || (p.week ? p.week + '~' : '9999')) + (p.time || '') + String(p.order ?? 0).padStart(4, '0');
 const sortPosts = arr => arr.slice().sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
 const needsAttention = cid => postsOf(cid).filter(p => p.unread || p.approval === 'changes').length;
+// ikonka „kopiuj” przy polu edytora (data-copy = nazwa pola albo 'full' – opis z CTA i hashtagami)
+const cpBtn = (f, title = 'Kopiuj', text = '') => `<button type="button" class="cpy ${text ? 'txt' : ''}" data-copy="${f}" title="${title}">${ICON.copy}${text}</button>`;
 const caption = (p, ch) => [ch === 'li' ? p.copyLi : p.copyMeta, p.cta, p.hashtags].filter(s => s && s.trim()).join('\n\n');
 const shareUrl = c => `${location.origin}/p/${c.token}`;
 const mkey = (cid, mk) => cid + '|' + mk;
@@ -846,29 +849,29 @@ function renderDrawer() {
         </div>
         <div class="two">
           <div class="field"><label>Filar</label><select class="select" data-f="pillar"><option value="">— bez filaru —</option>${(c.pillars || []).map(p => opt(p.name, d.pillar)).join('')}${d.pillar && !pl ? opt(d.pillar, d.pillar) : ''}</select></div>
-          <div class="field"><label>Temat</label><input class="input" data-f="title" value="${esc(d.title)}" placeholder="np. Optymalizacja kosztów ochrony"></div>
+          <div class="field"><label>Temat${cpBtn('title')}</label><input class="input" data-f="title" value="${esc(d.title)}" placeholder="np. Optymalizacja kosztów ochrony"></div>
         </div>
         ${pl && (pl.goal || pl.what) ? `<div class="guide" style="margin:-4px 0 12px"><b>${esc(pl.name)}</b>${pl.goal ? ` · cel: ${esc(pl.goal)}` : ''}${pl.what ? `<br>Co publikujemy: ${esc(pl.what)}` : ''}</div>` : ''}
-        <div class="field"><label>Założenie / opis pomysłu <span class="hint">· o czym jest post</span></label><textarea class="input" data-f="brief" rows="2" style="min-height:56px">${esc(d.brief)}</textarea></div>
+        <div class="field"><label>Założenie / opis pomysłu <span class="hint">· o czym jest post</span>${cpBtn('brief')}</label><textarea class="input" data-f="brief" rows="2" style="min-height:56px">${esc(d.brief)}</textarea></div>
 
         <div class="sec">Treść${aiUi('data-ai="write-open"', d.copyMeta.trim() || d.copyLi.trim() ? 'Popraw z AI' : 'Napisz z AI', 'btn sm')}</div>
         <div class="captabs">
           ${d.meta ? `<button class="${drawer.cap === 'meta' ? 'on' : ''}" data-act="cap" data-v="meta"><span class="ch">${ICON.ig}${ICON.fb}</span>Opis FB + IG${!d.copyMeta.trim() ? '<span class="dot" title="pusty"></span>' : ''}</button>` : ''}
           ${d.li ? `<button class="${drawer.cap === 'li' ? 'on' : ''}" data-act="cap" data-v="li"><span class="ch">${ICON.li}</span>Opis LinkedIn${!d.copyLi.trim() ? '<span class="dot" title="pusty"></span>' : ''}</button>` : ''}
-          <span class="grow"></span>${drawer.cap === 'li' && d.meta ? `<button data-act="copy-meta-li" style="font-weight:500">⧉ Skopiuj z FB + IG</button>` : ''}
+          <span class="grow"></span>${drawer.cap === 'li' && d.meta ? `<button data-act="copy-meta-li" style="font-weight:500">⧉ Skopiuj z FB + IG</button>` : ''}${cpBtn(capField, 'Kopiuj opis')}${cpBtn('full', 'Kopiuj gotowy tekst do publikacji: opis + CTA + hashtagi', 'Całość')}
         </div>
         <div class="field"><textarea class="input" data-f="${capField}" rows="9" placeholder="Wklej lub napisz opis posta…">${esc(d[capField])}</textarea></div>
-        <div class="field"><label>CTA <span class="hint">· dopisywane na końcu opisu</span></label><textarea class="input" data-f="cta" rows="2" style="min-height:44px">${esc(d.cta)}</textarea></div>
+        <div class="field"><label>CTA <span class="hint">· dopisywane na końcu opisu</span>${cpBtn('cta')}</label><textarea class="input" data-f="cta" rows="2" style="min-height:44px">${esc(d.cta)}</textarea></div>
         <div class="two">
-          <div class="field"><label>Hashtagi ${c.hashtags ? `<button class="btn sm ghost" data-act="add-tags">＋ stałe</button>` : ''}</label><textarea class="input" data-f="hashtags" rows="2" style="min-height:52px" placeholder="#marka #branża">${esc(d.hashtags)}</textarea></div>
-          <div class="field"><label>Oznaczenia <span class="hint">· konta do oznaczenia</span></label><textarea class="input" data-f="mentions" rows="2" style="min-height:52px" placeholder="@partner, @osoba">${esc(d.mentions)}</textarea></div>
+          <div class="field"><label>Hashtagi ${c.hashtags ? `<button class="btn sm ghost" data-act="add-tags">＋ stałe</button>` : ''}${cpBtn('hashtags')}</label><textarea class="input" data-f="hashtags" rows="2" style="min-height:52px" placeholder="#marka #branża">${esc(d.hashtags)}</textarea></div>
+          <div class="field"><label>Oznaczenia <span class="hint">· konta do oznaczenia</span>${cpBtn('mentions')}</label><textarea class="input" data-f="mentions" rows="2" style="min-height:52px" placeholder="@partner, @osoba">${esc(d.mentions)}</textarea></div>
         </div>
         <div class="counter ${len > lim ? 'warn' : ''}" id="counter">${len} / ${lim} znaków (${drawer.cap === 'li' ? 'LinkedIn' : 'Instagram'})</div>
 
         <div class="sec">Grafika / materiały</div>
         <div class="two">
-          <div class="field"><label>Tekst na grafice</label><textarea class="input" data-f="onGraphic" rows="2" style="min-height:56px" placeholder="Nagłówek, slajdy karuzeli…">${esc(d.onGraphic)}</textarea></div>
-          <div class="field"><label>Materiał – opis <span class="hint">· brief dla grafika</span></label><textarea class="input" data-f="materialBrief" rows="2" style="min-height:56px" placeholder="Co ma być na zdjęciu / grafice">${esc(d.materialBrief)}</textarea></div>
+          <div class="field"><label>Tekst na grafice${cpBtn('onGraphic')}</label><textarea class="input" data-f="onGraphic" rows="2" style="min-height:56px" placeholder="Nagłówek, slajdy karuzeli…">${esc(d.onGraphic)}</textarea></div>
+          <div class="field"><label>Materiał – opis <span class="hint">· brief dla grafika</span>${cpBtn('materialBrief')}</label><textarea class="input" data-f="materialBrief" rows="2" style="min-height:56px" placeholder="Co ma być na zdjęciu / grafice">${esc(d.materialBrief)}</textarea></div>
         </div>
         <div class="drop" data-act="upload" id="drop">⬆ Przeciągnij pliki PNG/JPG, kliknij, aby wybrać, lub wklej obraz <b>Ctrl+V</b></div>
         <div class="row" style="margin-top:8px"><input class="input" id="linkIn" placeholder="Link do Dysku Google / WeTransfer / Canva…"><button class="btn" data-act="add-link">Dodaj link</button></div>
@@ -1719,6 +1722,22 @@ document.addEventListener('click', async e => {
     case 'c-accept': clientAction(id, 'accept', el); break;
     case 'c-changes': clientAction(id, 'changes', el); break;
     case 'c-comment': clientAction(id, 'comment', el); break;
+  }
+});
+
+async function copyText(text) {
+  if (!text.trim()) { toast('Pole jest puste'); return false; }
+  try { await navigator.clipboard.writeText(text); }
+  catch { const ta = document.createElement('textarea'); ta.value = text; ta.style.cssText = 'position:fixed;opacity:0'; document.body.append(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+  return true;
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-copy]'); if (!b || !drawer) return;
+  e.preventDefault();
+  const f = b.dataset.copy, d = drawer.draft;
+  if (await copyText(f === 'full' ? caption(d, drawer.cap) : String(d[f] || ''))) {
+    toast(f === 'full' ? 'Skopiowano opis z CTA i hashtagami' : 'Skopiowano');
+    b.classList.add('ok'); setTimeout(() => b.classList.remove('ok'), 1200);
   }
 });
 
