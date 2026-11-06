@@ -730,6 +730,7 @@ function previewWarnings(p) {
       const r0 = ratioOf(imgs[0]);
       if (r0 < .79 || r0 > 1.92) w.push(`Instagram przytnie grafikę do ${r0 < 1 ? '4:5' : '1,91:1'} (obecnie ${imgs[0].w}×${imgs[0].h}).`);
       const odd = imgs.filter((m, i) => i && Math.abs(ratioOf(m) - r0) > .03).length;
+      if (Math.abs(r0 - 3 / 4) > .02 && !p.grid) w.push('Siatka profilu pokazuje miniaturę 3:4 – sprawdź kadr w zakładce „Siatka”.');
       if (odd) w.push(`Karuzela: ${odd} ${odd === 1 ? 'slajd ma' : 'slajdy mają'} inne proporcje niż pierwszy – Instagram przytnie je do proporcji pierwszego slajdu.`);
     }
   }
@@ -781,10 +782,11 @@ function renderLb() {
     <button class="lb-btn lb-x" data-act="lb-close" title="Zamknij (Esc)">✕</button>
     <div class="lb-cap"><b>${i + 1} / ${n}</b>${m.name ? ' · ' + esc(m.name) : ''}${m.w ? ` · ${m.w}×${m.h}` : ''} · pełna grafika bez przycięcia</div></div>`;
 }
-const pvTabsFor = p => [...(p.meta ? ['ig', 'fb'] : []), ...(p.li ? ['li'] : [])];
+const pvTabsFor = p => [...(p.meta ? ['ig', ...(isStory(p.format) ? [] : ['grid']), 'fb'] : []), ...(p.li ? ['li'] : [])];
 const PV_LABEL = { ig: [ICON.ig, 'Instagram'], fb: [ICON.fb, 'Facebook'], li: [ICON.li, 'LinkedIn'] };
 function previewFor(p, c, which) {
   if (which === 'li') return previewLI(p, c);
+  if (which === 'grid') return previewGrid(p, c, !!drawer && drawer.draft === p);
   return which === 'fb' ? previewFB(p, c) : previewIG(p, c);
 }
 

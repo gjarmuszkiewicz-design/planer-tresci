@@ -467,3 +467,16 @@ table.plan.full{min-width:2100px}
 .ai-text{font-size:13px;margin-top:6px;white-space:normal;line-height:1.5}
 .ai-progress{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#1e1b4b;color:#fff;padding:9px 16px;border-radius:999px;z-index:60;display:flex;gap:10px;align-items:center;font-size:13px;box-shadow:var(--shadow-lg)}
 @media (max-width:640px){.ai-row{grid-template-columns:20px 1fr}.ai-when{flex-direction:row;gap:6px}.ai-row .ai-main{grid-column:2}}
+
+/* ================= siatka profilu Instagram ================= */
+.ig-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px}
+.gt{position:relative;aspect-ratio:3/4;overflow:hidden;background:#efefef}
+.gt img{position:absolute;max-width:none;user-select:none;-webkit-user-drag:none}
+.gt.cur::after{content:"";position:absolute;inset:0;box-shadow:inset 0 0 0 3px var(--accent);pointer-events:none}
+.gph{position:absolute;inset:0;display:grid;place-items:center;padding:8px;text-align:center;font-size:10px;color:#64748b;line-height:1.3;overflow:hidden}
+.gic{position:absolute;top:6px;right:6px;width:16px;height:16px;filter:drop-shadow(0 0 2px rgba(0,0,0,.5))}
+.gic svg{width:100%;height:100%}
+.gedit{padding:12px 14px;border-bottom:1px solid var(--border2);background:#fafafa}
+.gcrop{width:200px;margin:0 auto;cursor:grab;touch-action:none;border-radius:4px}
+.gcrop.drag{cursor:grabbing}
+.gguide{position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,transparent calc(33.33% - .5px),rgba(255,255,255,.55) calc(33.33% - .5px),rgba(255,255,255,.55) calc(33.33% + .5px),transparent calc(33.33% + .5px),transparent calc(66.66% - .5px),rgba(255,255,255,.55) calc(66.66% - .5px),rgba(255,255,255,.55) calc(66.66% + .5px),transparent calc(66.66% + .5px)),linear-gradient(transparent calc(33.33% - .5px),rgba(255,255,255,.55) calc(33.33% - .5px),rgba(255,255,255,.55) calc(33.33% + .5px),transparent calc(33.33% + .5px),transparent calc(66.66% - .5px),rgba(255,255,255,.55) calc(66.66% - .5px),rgba(255,255,255,.55) calc(66.66% + .5px),transparent calc(66.66% + .5px))}

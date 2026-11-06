@@ -90,7 +90,7 @@ def robots():
 def _versioned_index() -> str:
     """index.html z numerem wersji przy app.js i app.css – po wdrożeniu przeglądarki pobiorą nowe pliki."""
     page = INDEX.read_text(encoding="utf-8")
-    for name in ("app.js", "studio.js", "ai.js", "app.css"):
+    for name in ("app.js", "studio.js", "grid.js", "ai.js", "app.css"):
         digest = hashlib.sha1((STATIC / name).read_bytes()).hexdigest()[:10]
         page = page.replace(f"/static/{name}", f"/static/{name}?v={digest}")
     return page

@@ -11,7 +11,7 @@ Jedno miejsce na plany treści wszystkich klientów: tabela jak w Excelu, kalend
 | **Plan (tabela)** | Tygodnie z tematem tygodnia, rezerwa, uwagi operacyjne. Widok „Zwięzły” albo „Jak w Excelu” (wszystkie kolumny). Filtry: miesiąc, kanał, status, szukaj. Status publikacji przełączany jednym kliknięciem |
 | **Kalendarz** | Miesiąc z tematami tygodni i kolorami filarów, przeciąganie treści na inny dzień (także z rezerwy) |
 | **Edytor treści** | Kanały FB + IG i/lub LinkedIn z osobnym opisem dla LinkedIna, CTA, hashtagi, oznaczenia, tekst na grafice, brief dla grafika, pytanie „do potwierdzenia” dla klienta, notatka wewnętrzna, komentarze |
-| **Podgląd** | Jak w aplikacjach: karuzela Instagrama (przycięta do proporcji 1. slajdu), kolaż Facebooka jak w Meta, dokument LinkedIn z numerem strony, Rolka, Relacja. Galeria pełnoekranowa i ostrzeżenia o limitach i przycinaniu |
+| **Podgląd** | Jak w aplikacjach: karuzela Instagrama (przycięta do proporcji 1. slajdu), kolaż Facebooka jak w Meta, dokument LinkedIn z numerem strony, Rolka, Relacja. Zakładka „Siatka” pokazuje profil Instagrama z miniaturami 3:4 (tak jak siatka od 2025 r.); kadr miniatury ustawia się przeciągnięciem i suwakiem powiększenia, a przy rolce można wybrać okładkę. Klient widzi ten sam kadr w swoim panelu. Galeria pełnoekranowa i ostrzeżenia o limitach i przycinaniu |
 | **Profil klienta** | Konta, zasady publikacji, ton, stałe hashtagi, filary z opisem (cel, grupa, co publikujemy, przykłady) |
 | **Panel klienta** | Link `/p/<token>` bez logowania: plan z tematami tygodni, podgląd każdej treści, „Akceptuję” / „Poproś o zmiany”, komentarze. Serwer nie wysyła klientowi szkiców, notatek wewnętrznych ani ustawień agencji |
 | **Import z Excela** | Wspólny schemat (niżej) oraz starsze plany (układ Lion i see, arkusz LinkedIn, „Opis filarów”), grafiki wklejone w arkusz, tygodnie, rezerwę i uwagi; podgląd przed importem z dopasowaniem kolumn |
@@ -101,7 +101,7 @@ app/
   marki/       systemy identyfikacji marek dla modułu Grafiki (tylko po zalogowaniu)
   auth.py      hasła (scrypt), sesja, konto administratora ze zmiennych
   models.py    tabele: users, clients, posts, month_plans, comments, media, designs
-  static/      interfejs (app.js, studio.js – moduł Grafiki, ai.js – asystent AI, app.css, index.html)
+  static/      interfejs (app.js, studio.js – moduł Grafiki, grid.js – siatka Instagrama, ai.js – asystent AI, app.css, index.html)
 tests/         testy przepływu
 ```
 
