@@ -464,12 +464,13 @@ function viewTable(c) {
       <div class="card-b"><textarea class="input" data-notes="${ui.month}" placeholder="Zasady publikacji, rzeczy do potwierdzenia z klientem przed publikacją…">${esc(md.notes)}</textarea></div></div>` : ''}`;
 }
 
-function chip(p, editable) {
+function chip(p, editable, tbd) {
   const c = clientById(p.clientId);
   const pc = pillarOf(c, p.pillar)?.color;
-  return `<div class="chip ${p.approval} ${p.published ? 'pub' : ''}" ${editable ? 'draggable="true"' : ''} data-act="${editable ? 'open-post' : 'portal-jump'}" data-id="${p.id}" title="${esc(p.title)}${p.pillar ? ' · ' + esc(p.pillar) : ''}">
+  return `<div class="chip ${p.approval} ${p.published ? 'pub' : ''} ${tbd ? 'tbd' : ''}" ${editable ? 'draggable="true"' : ''} data-act="${editable ? 'open-post' : 'portal-jump'}" data-id="${p.id}" title="${esc(p.title)}${p.pillar ? ' · ' + esc(p.pillar) : ''}${tbd ? ' · dzień do ustalenia' : ''}">
     ${p.meta ? ICON.ig : ''}${p.li ? ICON.li : ''}${pc ? `<span class="pd" style="background:${esc(pc)}"></span>` : ''}${p.time ? `<span class="tm">${esc(p.time)}</span>` : ''}<span class="t">${esc(p.title || p.format)}</span>${p.unread && editable ? '<span class="newdot"></span>' : ''}</div>`;
 }
+const WEEK_SLOTS = { 1: [0], 2: [1, 2], 3: [0, 2, 4], 4: [0, 1, 3, 4], 5: [0, 1, 2, 3, 4] };
 function calendarGrid(c, posts, mk, editable) {
   const [y, m] = mk.split('-').map(Number);
   const first = new Date(y, m - 1, 1);
@@ -477,23 +478,30 @@ function calendarGrid(c, posts, mk, editable) {
   const last = new Date(y, m, 0);
   const days = Math.ceil(((first.getDay() + 6) % 7 + last.getDate()) / 7) * 7;
   const by = {}; posts.filter(p => p.date).forEach(p => (by[p.date] ||= []).push(p));
+  // treści z tygodniem bez dnia: rozkładamy na dni tygodnia (pon / wt śr / pon śr pt …), dzień jest tylko orientacyjny
+  const tbd = new Set(), weekly = {};
+  posts.filter(p => !p.date && p.week).forEach(p => (weekly[p.week] ||= []).push(p));
+  Object.entries(weekly).forEach(([w, list]) => {
+    const n = list.length, slots = WEEK_SLOTS[n] || list.map((_, i) => Math.floor(i * 5 / n));
+    sortPosts(list).forEach((p, i) => { const k = ymd(addDays(parseYmd(w), slots[i])); (by[k] ||= []).push(p); tbd.add(p); });
+  });
   const md = monthData(c.id, mk);
   let h = DOW.map(d => `<div class="dh">${d}</div>`).join('');
   for (let i = 0; i < days; i++) {
     const d = addDays(start, i), k = ymd(d);
     if (i % 7 === 0) {
-      const theme = md.weeks[k]; const undated = posts.filter(p => !p.date && p.week === k);
-      if (theme || undated.length) h += `<div class="wkbar"><b>Tydzień ${i / 7 + 1}</b>${theme ? ' · ' + esc(theme) : ''}${undated.length ? ` · <span class="muted">${undated.length} bez dnia: ${undated.map(p => esc(p.title || p.format)).join(', ')}</span>` : ''}</div>`;
+      const theme = md.weeks[k], n = (weekly[k] || []).length;
+      if (theme || n) h += `<div class="wkbar"><b>Tydzień ${i / 7 + 1}</b>${theme ? ' · ' + esc(theme) : ''}${n ? ` · <span class="muted">${n} ${n === 1 ? 'treść' : 'treści'} z dniem do ustalenia (przerywana ramka)</span>` : ''}</div>`;
     }
-    const chips = sortPosts(by[k] || []).map(p => chip(p, editable)).join('');
+    const chips = sortPosts(by[k] || []).map(p => chip(p, editable, tbd.has(p))).join('');
     h += `<div class="d ${k.slice(0, 7) !== mk ? 'out' : ''} ${k === TODAY ? 'today' : ''}" data-date="${k}">
       <div class="num">${d.getDate()}</div>${editable ? `<button class="add" data-act="new-post" data-date="${k}" data-client="${c.id}" title="Dodaj treść">+</button>` : ''}${chips}</div>`;
   }
-  const undated = sortPosts(posts.filter(p => !p.date));
+  const undated = sortPosts(posts.filter(p => !p.date && !p.week));
   return `<div class="cal">${h}</div>
-    ${undated.length ? `<div class="card" style="margin-top:12px"><div class="card-b" style="padding:12px 14px"><div class="small" style="font-weight:600">Bez konkretnego dnia (tygodnie i rezerwa) – ${undated.length}${editable ? ' <span class="muted" style="font-weight:400">· przeciągnij na dzień, aby zaplanować</span>' : ''}</div>
+    ${undated.length ? `<div class="card" style="margin-top:12px"><div class="card-b" style="padding:12px 14px"><div class="small" style="font-weight:600">Rezerwa – ${undated.length}${editable ? ' <span class="muted" style="font-weight:400">· przeciągnij na dzień, aby zaplanować</span>' : ''}</div>
       <div class="undated">${undated.map(p => chip(p, editable)).join('')}</div></div></div>` : ''}
-    <div class="legend"><span><i style="background:#d1d5db"></i>Szkic</span><span><i style="background:#f59e0b"></i>Do akceptacji</span><span><i style="background:#10b981"></i>Zaakceptowany</span><span><i style="background:#ef4444"></i>Do poprawy</span><span style="text-decoration:line-through">Opublikowany</span>
+    <div class="legend"><span><i style="background:#d1d5db"></i>Szkic</span><span><i style="background:#f59e0b"></i>Do akceptacji</span><span><i style="background:#10b981"></i>Zaakceptowany</span><span><i style="background:#ef4444"></i>Do poprawy</span><span style="text-decoration:line-through">Opublikowany</span><span><i style="background:#fff;border:1px dashed #6b7280"></i>Dzień do ustalenia</span>
     ${editable ? '<span class="grow"></span><span>Przeciągnij treść na inny dzień, aby zmienić datę</span>' : ''}</div>`;
 }
 

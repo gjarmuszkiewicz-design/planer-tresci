@@ -481,3 +481,5 @@ table.plan.full{min-width:2100px}
 .gcrop{width:200px;margin:0 auto;cursor:grab;touch-action:none;border-radius:4px}
 .gcrop.drag{cursor:grabbing}
 .gguide{position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,transparent calc(33.33% - .5px),rgba(255,255,255,.55) calc(33.33% - .5px),rgba(255,255,255,.55) calc(33.33% + .5px),transparent calc(33.33% + .5px),transparent calc(66.66% - .5px),rgba(255,255,255,.55) calc(66.66% - .5px),rgba(255,255,255,.55) calc(66.66% + .5px),transparent calc(66.66% + .5px)),linear-gradient(transparent calc(33.33% - .5px),rgba(255,255,255,.55) calc(33.33% - .5px),rgba(255,255,255,.55) calc(33.33% + .5px),transparent calc(33.33% + .5px),transparent calc(66.66% - .5px),rgba(255,255,255,.55) calc(66.66% - .5px),rgba(255,255,255,.55) calc(66.66% + .5px),transparent calc(66.66% + .5px))}
+.chip.tbd{border-left-style:dashed;outline:1px dashed #94a3b8;outline-offset:-1px}
+.chip.tbd .t{font-style:italic}
