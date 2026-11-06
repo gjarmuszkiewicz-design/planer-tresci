@@ -490,8 +490,11 @@ function calendarGrid(c, posts, mk, editable) {
   for (let i = 0; i < days; i++) {
     const d = addDays(start, i), k = ymd(d);
     if (i % 7 === 0) {
+      // pasek każdego tygodnia (także bez tematu i treści); w panelu agencji temat można wpisać od razu tutaj
       const theme = md.weeks[k], n = (weekly[k] || []).length;
-      if (theme || n) h += `<div class="wkbar"><b>Tydzień ${i / 7 + 1}</b>${theme ? ' · ' + esc(theme) : ''}${n ? ` · <span class="muted">${n} ${n === 1 ? 'treść' : 'treści'} z dniem do ustalenia (przerywana ramka)</span>` : ''}</div>`;
+      h += `<div class="wkbar"><b>Tydzień ${i / 7 + 1}</b><span class="muted">${weekRange(k)}</span>${editable
+        ? `<input class="wk-in" data-week="${k}" data-mk="${mk}" value="${esc(theme || '')}" placeholder="Temat tygodnia…">`
+        : theme ? `<span>· ${esc(theme)}</span>` : ''}${n ? `<span class="muted wk-n">${n} ${n === 1 ? 'treść' : 'treści'} z dniem do ustalenia</span>` : ''}</div>`;
     }
     const chips = sortPosts(by[k] || []).map(p => chip(p, editable, tbd.has(p))).join('');
     h += `<div class="d ${k.slice(0, 7) !== mk ? 'out' : ''} ${k === TODAY ? 'today' : ''}" data-date="${k}">
