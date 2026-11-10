@@ -495,3 +495,18 @@ table.plan.full{min-width:2100px}
 .captabs .cpy.txt{padding:0 7px}
 .captabs .cpy:hover{border-color:var(--border);color:#111827}
 .captabs .cpy.ok{color:#059669;border-color:#a7f3d0}
+/* linki do materiałów klienta */
+.links-bar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:-4px 0 14px}
+.links-bar .lb-l{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--muted);margin-right:2px}
+.links-bar .lb-l svg{width:14px;height:14px}
+.lnk{display:inline-flex;align-items:center;gap:2px;background:#fff;border:1px solid var(--border);border-radius:999px;padding:3px 4px 3px 11px;font-size:12.5px;max-width:280px}
+.lnk a{color:var(--accent);font-weight:550;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lnk a:hover{text-decoration:underline}
+.lnk button{border:0;background:none;color:var(--faint);cursor:pointer;border-radius:50%;width:22px;height:22px;font-size:12px}
+.lnk button:hover{background:#f3f4f8;color:#111827}
+.lnk:not(:has(button)){padding-right:11px}
+.lnk-sh{font-size:10.5px;font-weight:600;color:#047857;background:#ecfdf5;border-radius:999px;padding:1px 6px;margin-left:5px}
+.lnk-add{border:1px dashed #c7cbd6;background:none;border-radius:999px;padding:4px 11px;font-size:12.5px;color:var(--muted);cursor:pointer}
+.lnk-add:hover{border-color:var(--accent);color:var(--accent)}
+.portal .links-bar{margin:0 0 14px}
+.studio.st-in .st-head{align-items:center;margin-bottom:4px}

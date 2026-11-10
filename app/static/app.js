@@ -37,6 +37,7 @@ const ICON = {
   ig: '<svg viewBox="0 0 24 24" fill="none" stroke="#d62976" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#d62976"/></svg>',
   fb: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#1877f2"/><path d="M13.2 19v-6h2l.3-2.4h-2.3V9.2c0-.7.2-1.2 1.2-1.2h1.2V5.9a16 16 0 0 0-1.8-.1c-1.8 0-3 1.1-3 3.1v1.7h-2V13h2v6z" fill="#fff"/></svg>',
   li: '<svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="4" fill="#0a66c2"/><path d="M7 10h2.2v7H7zM8.1 6.5a1.3 1.3 0 1 1 0 2.6 1.3 1.3 0 0 1 0-2.6zM10.8 10h2.1v1c.3-.6 1.1-1.2 2.2-1.2 2.3 0 2.7 1.5 2.7 3.4V17h-2.2v-3.4c0-.8 0-1.9-1.2-1.9s-1.4.9-1.4 1.8V17h-2.2z" fill="#fff"/></svg>',
+  link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>',
   copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>',
   heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>',
   comment: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l1-4.2A8 8 0 1 1 20 12z"/></svg>',
@@ -225,8 +226,13 @@ let imp = null;  // excel import state
 function route() {
   if (PORTAL_TOKEN) return { name: 'portal', token: PORTAL_TOKEN };
   const h = location.hash.replace(/^#\/?/, '').split('/');
-  if (h[0] === 'k' && h[1]) return { name: 'client', id: h[1], tab: h[2] || 'plan' };
-  if (h[0] === 'grafiki') return { name: 'studio', id: h[1] === 'p' ? h[2] : h[1] || '' };
+  if (h[0] === 'k' && h[1]) {
+    const tab = h[2] || 'plan';
+    // edytor grafiki zajmuje cały ekran: #/k/<klient>/grafiki/nowy albo #/k/<klient>/grafiki/p/<projekt>
+    if (tab === 'grafiki' && h[3]) return { name: 'studio', id: h[1], tab, did: h[3] === 'p' ? h[4] || '' : h[3] };
+    return { name: 'client', id: h[1], tab };
+  }
+  if (h[0] === 'grafiki') return { name: 'old-studio' };
   return { name: 'dash' };
 }
 window.addEventListener('hashchange', () => { closeDrawer(true); render(); window.scrollTo(0, 0); });
@@ -235,11 +241,16 @@ function render() {
   const r = route();
   document.title = 'WIZme Social';
   if (r.name === 'portal') { $('#app').innerHTML = viewPortal(r.token); return; }
+  // stary adres modułu Grafiki prowadzi do zakładki Grafiki klienta z systemem marki
+  if (r.name === 'old-studio') { const c = state.clients.find(x => clientBrand(x)); location.replace(c ? `#/k/${c.id}/grafiki` : '#/'); return; }
   let body;
   if (r.name === 'client') {
     const c = clientById(r.id);
     body = c ? viewClient(c, r.tab) : `<div class="container"><div class="empty"><b>Nie znaleziono klienta</b><a href="#/">Wróć do pulpitu</a></div></div>`;
-  } else if (r.name === 'studio') body = viewStudio(r);
+  } else if (r.name === 'studio') {
+    const c = clientById(r.id);
+    body = c && clientBrand(c) ? viewStudio(r, c) : `<div class="container"><div class="empty"><b>Ten klient nie ma systemu identyfikacji</b><a href="#/">Wróć do pulpitu</a></div></div>`;
+  }
   else body = viewDash();
   $('#app').innerHTML = `<div class="shell">${viewSide(r)}<main class="main">${body}</main></div>`;
   if (r.name === 'studio') studioMounted();
@@ -249,16 +260,14 @@ function render() {
 function viewSide(r) {
   const clients = state.clients.map(c => {
     const n = needsAttention(c.id);
-    return `<a href="#/k/${c.id}/${r.name === 'client' ? r.tab : 'plan'}" class="${r.id === c.id ? 'active' : ''}">
+    return `<a href="#/k/${c.id}/${r.name === 'client' && (r.tab !== 'grafiki' || clientBrand(c)) ? r.tab : 'plan'}" class="${r.id === c.id ? 'active' : ''}">
       ${avatar(c, 22)}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name)}</span>${n ? `<span class="cnt" title="Uwagi klienta / do poprawy">${n}</span>` : ''}</a>`;
   }).join('');
   return `<aside class="side">
     <div class="brand"><a href="#/" aria-label="Pulpit"><img src="/static/logo-wizme-white.png" alt="WIZme"><span class="app">Planer treści</span></a><span class="grow"></span>
       <button class="bell" data-act="notif" title="Powiadomienia od klientów">${ICON.bell}${notifs.unread ? `<span class="dot">${notifs.unread > 99 ? '99+' : notifs.unread}</span>` : ''}</button></div>
     <nav class="nav"><a href="#/" class="${r.name === 'dash' ? 'active' : ''}">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Pulpit</a>
-      <a href="#/grafiki" class="${r.name === 'studio' ? 'active' : ''}">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="8.5" cy="8.5" r="1.8"/><path d="m21 15-5-5L5 21"/></svg>Grafiki</a></nav>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Pulpit</a></nav>
     <div class="nav-label">Klienci</div>
     <div class="scroll"><nav class="nav">${clients || '<div class="small" style="padding:6px 12px;color:rgba(255,255,255,.5)">Brak klientów</div>'}</nav></div>
     <div class="foot">
@@ -327,20 +336,67 @@ function viewDash() {
   </div>`;
 }
 
+/* ================= linki do materiałów klienta ================= */
+// klient z systemem identyfikacji (app/marki) dostaje zakładkę Grafiki – na razie dopasowanie po nazwie marki
+const clientBrand = c => (studio.brands || [{ id: 'wizme', nazwa: 'WIZme' }])
+  .find(b => c.brand === b.id || pkey(c.name).includes(pkey(b.nazwa)))?.id || '';
+// dawne pole „Folder z materiałami” pokazujemy jako pierwszy link, dopóki ktoś nie zmieni listy
+const linksOf = c => c.links || (c.drive ? [{ name: 'Folder z materiałami', url: c.drive, shared: false }] : []);
+const safeUrl = u => /^https?:\/\//i.test(u) ? u : 'https://' + String(u).replace(/^[a-z][\w+.-]*:\/*/i, '');
+function linksBar(c, editable) {
+  const ls = editable ? linksOf(c) : (c.links || []);
+  if (!editable && !ls.length) return '';
+  return `<div class="links-bar"><span class="lb-l">${ICON.link} Linki</span>${ls.map((l, i) => `<span class="lnk"><a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener" title="${esc(l.url)}">${esc(l.name || linkName(l.url))}</a>${editable
+      ? `${l.shared ? '<span class="lnk-sh" title="Klient widzi ten link w swoim panelu">klient</span>' : ''}<button data-act="link-edit" data-i="${i}" title="Edytuj lub usuń">✎</button>` : ''}</span>`).join('')}${editable
+    ? `<button class="lnk-add" data-act="link-add">＋ Dodaj link</button>${ls.length ? '' : '<span class="small muted">Dysk Google, materiały od klienta, Canva, brief…</span>'}` : ''}</div>`;
+}
+function linkModal(c, i) {
+  const l = i >= 0 ? linksOf(c)[i] : { name: '', url: '', shared: false };
+  modal(`<div class="modal-h"><h2 style="font-size:18px">${i >= 0 ? 'Edytuj link' : 'Dodaj link'}</h2></div>
+    <div class="modal-b">
+      <div class="field"><label>Adres</label><input class="input" id="lkUrl" value="${esc(l.url)}" placeholder="https://drive.google.com/…"></div>
+      <div class="field"><label>Nazwa <span class="hint">· np. Zdjęcia od klienta, Logo i księga znaku</span></label><input class="input" id="lkName" value="${esc(l.name)}" placeholder="pusta = adres strony"></div>
+      <label class="st-check"><input type="checkbox" id="lkShared" ${l.shared ? 'checked' : ''}> Pokaż klientowi w jego panelu</label>
+    </div>
+    <div class="modal-f">${i >= 0 ? `<button class="btn bad" data-act="link-del" data-i="${i}">Usuń</button><span class="grow"></span>` : ''}<button class="btn" data-act="close-modal">Anuluj</button><button class="btn primary" data-act="link-save" data-i="${i}">Zapisz</button></div>`);
+  $('#lkUrl').focus();
+}
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act^="link-"]'); if (!el || PORTAL_TOKEN) return;
+  const c = clientById(route().id); if (!c) return;
+  const a = el.dataset.act, i = +(el.dataset.i ?? -1);
+  if (a === 'link-add') return linkModal(c, -1);
+  if (a === 'link-edit') return linkModal(c, i);
+  const ls = linksOf(c).slice();
+  if (a === 'link-del') { if (!confirm(`Usunąć link „${ls[i].name || ls[i].url}”?`)) return; ls.splice(i, 1); }
+  if (a === 'link-save') {
+    const url = $('#lkUrl').value.trim();
+    if (!/^(https?:\/\/)?[\w-]+(\.[\w-]+)+/i.test(url)) { toast('Wklej pełny adres, np. https://drive.google.com/…'); return; }
+    const l = { name: $('#lkName').value.trim(), url: safeUrl(url), shared: $('#lkShared').checked };
+    if (i >= 0) ls[i] = l; else ls.push(l);
+  }
+  c.links = ls; c.drive = '';
+  save(); closeModal(); render();
+});
+
 /* ================= client views ================= */
 function viewClient(c, tab) {
-  const tabs = [['plan', 'Plan (tabela)'], ['kalendarz', 'Kalendarz'], ['profil', 'Profil, filary i ustawienia']];
+  const brand = clientBrand(c);
+  const tabs = [['plan', 'Plan (tabela)'], ['kalendarz', 'Kalendarz'], ...(brand ? [['grafiki', 'Grafiki']] : []), ['profil', 'Profil, filary i ustawienia']];
+  if (tab === 'grafiki' && !brand) tab = 'plan';
   let content;
   if (tab === 'kalendarz') content = viewCalendar(c);
+  else if (tab === 'grafiki') content = viewStudio({ did: '' }, c);
   else if (tab === 'profil') content = viewProfile(c);
   else content = viewTable(c);
-  return `<div class="container ${tab === 'plan' && ui.full ? 'wide' : ''}">
+  return `<div class="container ${(tab === 'plan' && ui.full) || tab === 'grafiki' ? 'wide' : ''}">
     <div class="topbar">${avatar(c, 44)}<div><h1>${esc(c.name)}</h1>
       <div class="muted small row" style="gap:12px"><span class="ch">${ICON.ig}${ICON.fb} ${esc(c.igHandle ? '@' + c.igHandle : '—')}</span><span class="ch">${ICON.li} ${esc(c.liName || '—')}</span></div></div>
       <div class="grow"></div>
       <button class="btn" data-act="share" data-id="${c.id}">🔗 Link dla klienta</button>
       ${aiUi(`data-ai="plan-open" data-client="${c.id}"`, 'Zaplanuj z AI')}
       <button class="btn primary" data-act="new-post" data-client="${c.id}">＋ Nowa treść</button></div>
+    ${linksBar(c, true)}
     <div class="tabs">${tabs.map(([k, l]) => `<a href="#/k/${c.id}/${k}" class="${tab === k ? 'active' : ''}">${l}</a>`).join('')}</div>
     ${content}
   </div>`;
@@ -540,7 +596,6 @@ function viewProfile(c) {
         <label class="row small muted" style="gap:6px">Kolor <input type="color" data-cfield="color" value="${esc(c.color)}" style="width:34px;height:26px;border:0;padding:0;background:none"></label></div></div>
       ${f('name', 'Nazwa klienta')}
       ${f('contact', 'Osoba kontaktowa / akceptująca', 'np. Anna Nowak – marketing')}
-      ${f('drive', 'Folder z materiałami (Dysk Google)', 'https://drive.google.com/…')}
       ${f('notes', 'Notatki wewnętrzne', 'Wytyczne, zakazy, ustalenia…', 'textarea')}
     </div></div>
     <div class="card"><div class="card-h"><h3>Profile w social media</h3></div><div class="card-b">
@@ -989,6 +1044,7 @@ function viewPortal(token) {
   return `<div class="portal-top"><div class="in">${avatar(c, 36)}<div><div style="font-weight:650">${esc(c.name)}</div><div class="small muted">Plan treści do akceptacji</div></div>
     <span class="grow"></span><label class="small muted row">Twoje imię <input class="input" style="width:170px" data-act-input="reviewer" value="${esc(reviewer)}" placeholder="np. Anna Nowak"></label></div></div>
   <div class="portal">
+    ${linksBar(c, false)}
     <div class="notice">Sprawdź zaplanowane treści. Przy każdej możesz kliknąć <b>Akceptuję</b> albo <b>Poproś o zmiany</b> i dopisać uwagi. Agencja zobaczy je od razu.</div>
     <div class="toolbar">
       <div class="monthnav"><button class="btn icon" data-act="month" data-d="-1">‹</button><div class="label">${monthLabel(ui.month)}</div><button class="btn icon" data-act="month" data-d="1">›</button></div>

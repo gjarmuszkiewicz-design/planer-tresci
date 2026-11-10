@@ -5,7 +5,9 @@
 const studio = {
   brands: null, brand: 'wizme', designs: null, error: '',
   cur: null, dirty: false, frame: null, scale: 1, busy: '', pickFoto: false, loading: null,
+  cid: '', atMode: '',  // klient, w którego zakładce działa moduł; tryb okna „Dodaj do treści”
 };
+const stBase = () => `#/k/${studio.cid}/grafiki`;
 const brandOf = id => window.MARKI?.[id];
 const formatOf = d => brandOf(d.brand).formaty[d.format];
 const stDesign = id => studio.designs?.find(d => d.id === id);
@@ -28,20 +30,27 @@ function studioLoad() {
       studio.error = '';
     } catch (e) { studio.error = e.message; }
     studio.loading = null;
-    if (route().name === 'studio') render();
+    const r = route();
+    if (r.name === 'studio' || r.tab === 'grafiki') render();
   })();
 }
 
 /* ---------- widoki ---------- */
-function viewStudio(r) {
+// moduł działa w zakładce „Grafiki” klienta, który ma system identyfikacji (np. WIZme jako klient agencji)
+function viewStudio(r, c) {
+  studio.cid = c.id;
+  if (studio.brand !== clientBrand(c)) { studio.brand = clientBrand(c); studio.loading = null; }
   if (!studio.designs || !brandOf(studio.brand)?.przyklady) {
-    if (!studio.error) studioLoad();
-    return `<div class="container"><div class="empty">${studio.error ? `<b>Nie udało się otworzyć modułu Grafiki</b>${esc(studio.error)}` : 'Wczytuję system identyfikacji…'}</div></div>`;
+    if (!studio.error && !studio.loading) studioLoad();
+    return `<div class="empty">${studio.error ? `<b>Nie udało się otworzyć modułu Grafiki</b>${esc(studio.error)}` : 'Wczytuję system identyfikacji…'}</div>`;
   }
-  if (r.id === 'nowy' && studio.cur) return stEditor();
-  if (r.id && r.id !== 'nowy') {
-    const d = stDesign(r.id);
-    if (!d) return `<div class="container"><div class="empty"><b>Nie ma takiego projektu</b><a href="#/grafiki">Wróć do grafik</a></div></div>`;
+  if (r.did === 'nowy') {
+    if (studio.cur && !studio.cur.id) return stEditor();
+    location.replace(stBase()); return '';
+  }
+  if (r.did) {
+    const d = stDesign(r.did);
+    if (!d) return `<div class="container"><div class="empty"><b>Nie ma takiego projektu</b><a href="${stBase()}">Wróć do grafik</a></div></div>`;
     if (studio.cur?.id !== d.id) { studio.cur = structuredClone(d); studio.dirty = false; }
     return stEditor();
   }
@@ -55,10 +64,9 @@ function stGallery() {
   const card = (thumb, title, sub, attrs, extra = '') => `<div class="st-card" ${attrs}>
       <div class="st-thumb"><img src="${esc(thumb)}" alt="" loading="lazy"></div>
       <div class="st-cap"><b>${esc(title)}</b><span>${esc(sub)}</span></div>${extra}</div>`;
-  const brands = studio.brands.length > 1 ? `<div class="seg">${studio.brands.map(b => `<button class="${b.id === studio.brand ? 'on' : ''}" data-sa="brand" data-v="${esc(b.id)}">${esc(b.nazwa)}</button>`).join('')}</div>` : '';
-  return `<div class="container wide studio">
-    <div class="st-head"><div><h1>Grafiki</h1><p class="muted">Projekty w systemie identyfikacji ${esc(m.nazwa)}. Widzi je tylko zespół agencji, klienci nie mają do nich dostępu.</p></div>
-      <span class="grow"></span>${brands}<button class="btn primary" data-sa="new">＋ Nowa grafika</button></div>
+  return `<div class="studio st-in">
+    <div class="st-head"><p class="muted">Projekty w systemie identyfikacji ${esc(m.nazwa)}. Gotową grafikę dodasz do istniejącej albo nowej treści w planie. Widzi je tylko zespół agencji.</p>
+      <span class="grow"></span><button class="btn primary" data-sa="new">＋ Nowa grafika</button></div>
     <h2 class="st-h2">Twoje projekty</h2>
     ${mine.length ? `<div class="st-grid">${mine.map(d => card(d.thumb || m.podgladPrzykladu('t10'), d.name || 'Bez nazwy', `${fmt(d)} · ${fmtTs(d.updatedAt)}`,
       `data-sa="open" data-id="${esc(d.id)}"`, `<button class="st-del" data-sa="del" data-id="${esc(d.id)}" title="Usuń projekt">✕</button>`)).join('')}</div>`
@@ -102,7 +110,7 @@ function stForm() {
 function stEditor() {
   const d = studio.cur, f = formatOf(d);
   return `<div class="studio st-ed">
-    <div class="st-bar"><button class="btn ghost" data-sa="back">← Grafiki</button>
+    <div class="st-bar"><button class="btn ghost" data-sa="back">← Grafiki · ${esc(clientById(studio.cid)?.name || '')}</button>
       <input class="input st-name" data-sf="name" value="${esc(d.name || '')}" placeholder="Nazwa projektu">
       <span class="muted small" id="stState">${studio.dirty ? 'Niezapisane zmiany' : d.id ? 'Zapisano' : 'Nowy projekt'}</span><span class="grow"></span>
       <button class="btn" data-sa="png" ${studio.busy ? 'disabled' : ''}>⤓ Pobierz PNG</button>
@@ -196,7 +204,7 @@ function stSave() {
     const saved = await api('PUT', `/api/designs/${id}`, { brand, data });
     studio.designs = [saved, ...studio.designs.filter(x => x.id !== id)];
     studio.cur = structuredClone(saved); studio.dirty = false;
-    if (location.hash !== `#/grafiki/p/${id}`) history.replaceState(null, '', `#/grafiki/p/${id}`);
+    if (location.hash !== `${stBase()}/p/${id}`) history.replaceState(null, '', `${stBase()}/p/${id}`);
     toast('Projekt zapisany');
   });
 }
@@ -208,38 +216,59 @@ function stPng() {
   });
 }
 
-/* ---------- dodanie grafiki do treści w planie ---------- */
-function stAttachModal(cid) {
-  const brand = brandOf(studio.cur.brand);
+/* ---------- dodanie grafiki do treści w planie: do istniejącej albo do nowej ---------- */
+const stPostLabel = p => `${p.date ? fmtShort(p.date) : p.week ? 'tydz. ' + fmtShort(p.week) : 'rezerwa'} · ${p.format || 'treść'} · ${p.title || 'bez tematu'}${p.media.length ? ` (${p.media.length} graf.)` : ''}`;
+function stAttachModal(cid, mode) {
   const clients = state.clients;
   if (!clients.length) { toast('Najpierw dodaj klienta'); return; }
-  cid ||= (clients.find(c => pkey(c.name).includes(pkey(brand.nazwa))) || clients[0]).id;
+  cid ||= clientById(studio.cid) ? studio.cid : clients[0].id;
+  // najpierw treści od dziś, potem rezerwa i starsze
   const posts = sortPosts(postsOf(cid)).sort((a, b) => (a.date && a.date < TODAY) - (b.date && b.date < TODAY));
-  const label = p => `${p.date ? fmtShort(p.date) : p.week ? 'tydz. ' + fmtShort(p.week) : 'rezerwa'} · ${p.format || 'treść'} · ${p.title || 'bez tematu'}${p.media.length ? ` (${p.media.length} graf.)` : ''}`;
+  mode = studio.atMode = mode || studio.atMode || (posts.length ? 'old' : 'new');
+  const d = studio.cur, fmt = d.format === 'story' ? 'Relacja' : 'Post', li = /^li|linked/i.test(d.format);
+  const opt = (v, cur) => `<option ${v === cur ? 'selected' : ''}>${esc(v)}</option>`;
   modal(`<div class="modal-h"><h2 style="font-size:18px">Dodaj grafikę do treści</h2></div>
     <div class="modal-b">
       <div class="field"><label>Klient</label><select class="select" id="stAtClient">${clients.map(c => `<option value="${esc(c.id)}" ${c.id === cid ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div>
-      <div class="field"><label>Treść <span class="hint">grafika trafi na koniec jej materiałów</span></label>
-        ${posts.length ? `<select class="select" id="stAtPost" size="8">${posts.map((p, i) => `<option value="${esc(p.id)}" ${i === 0 ? 'selected' : ''}>${esc(label(p))}</option>`).join('')}</select>`
-        : '<div class="muted">Ten klient nie ma jeszcze treści.</div>'}</div>
-      <label class="st-check"><input type="checkbox" id="stAtNew"> Utwórz nową treść w rezerwie</label>
+      <div class="seg" style="margin-bottom:14px"><button class="${mode === 'old' ? 'on' : ''}" data-sa="at-mode" data-v="old">Do istniejącej treści</button><button class="${mode === 'new' ? 'on' : ''}" data-sa="at-mode" data-v="new">Nowa treść</button></div>
+      ${mode === 'old' ? (posts.length ? `<div class="field"><label>Treść <span class="hint">· grafika trafi na koniec jej materiałów</span></label>
+          <input class="input" id="stAtQ" placeholder="Szukaj po temacie lub formacie…" style="margin-bottom:6px">
+          <select class="select" id="stAtPost" size="9">${posts.map((p, i) => `<option value="${esc(p.id)}" ${i === 0 ? 'selected' : ''}>${esc(stPostLabel(p))}</option>`).join('')}</select></div>`
+        : '<div class="muted" style="margin-bottom:12px">Ten klient nie ma jeszcze treści – wybierz „Nowa treść”.</div>')
+      : `<div class="field"><label>Temat</label><input class="input" id="stAtTitle" value="${esc(d.name && d.name !== 'Nowa grafika' ? d.name : '')}" placeholder="Temat treści"></div>
+        <div class="two"><div class="field"><label>Data publikacji <span class="hint">· pusta = rezerwa</span></label><input class="input" type="date" id="stAtDate"></div>
+          <div class="field"><label>Format</label><select class="select" id="stAtFormat">${FORMATS.map(f => opt(f, fmt)).join('')}</select></div></div>
+        <div class="field"><label>Kanały</label><div class="row" style="gap:16px"><label class="st-check"><input type="checkbox" id="stAtMeta" ${li ? '' : 'checked'}> Facebook + Instagram</label><label class="st-check"><input type="checkbox" id="stAtLi" ${li ? 'checked' : ''}> LinkedIn</label></div></div>
+        <div class="small muted" style="margin-bottom:12px">Treść powstanie jako szkic (klient go nie widzi), opis dopiszesz w edytorze.</div>`}
+      <label class="st-check"><input type="checkbox" id="stAtOpen" checked> Otwórz treść po dodaniu${studio.dirty ? ' (projekt grafiki zapisze się sam)' : ''}</label>
     </div>
-    <div class="modal-f"><button class="btn" data-act="close-modal">Anuluj</button><button class="btn primary" data-sa="attach-do">Dodaj</button></div>`);
+    <div class="modal-f"><button class="btn" data-act="close-modal">Anuluj</button><button class="btn primary" data-sa="attach-do" ${mode === 'old' && !posts.length ? 'disabled' : ''}>${mode === 'old' ? 'Dodaj do treści' : 'Utwórz treść z grafiką'}</button></div>`);
 }
-function stAttach() {
-  const cid = $('#stAtClient').value, makeNew = $('#stAtNew').checked || !$('#stAtPost');
-  let post = makeNew ? null : state.posts.find(p => p.id === $('#stAtPost').value);
+async function stAttach() {
+  const cid = $('#stAtClient').value, mode = studio.atMode, openAfter = $('#stAtOpen').checked;
+  let post = null, fresh = null;
+  if (mode === 'old') {
+    post = state.posts.find(p => p.id === $('#stAtPost')?.value);
+    if (!post) { toast('Wybierz treść z listy'); return; }
+  } else {
+    const date = $('#stAtDate').value, meta = $('#stAtMeta').checked, li = $('#stAtLi').checked;
+    if (!meta && !li) { toast('Zaznacz co najmniej jeden kanał'); return; }
+    fresh = { clientId: cid, date, month: date ? date.slice(0, 7) : ui.month, approval: 'draft', title: $('#stAtTitle').value.trim() || 'Grafika', format: $('#stAtFormat').value, meta, li };
+  }
   closeModal();
-  return stRun('attach', async () => {
+  if (openAfter && studio.dirty) { await stSave(); if (studio.dirty) return; }
+  await stRun('attach', async () => {
     const d = studio.cur, canvas = await stCanvas();
     const m = await blobToMedia(await canvasBlob(canvas), `${fileName(d)}.png`, 2400);
-    if (!post) {
-      post = newPost({ clientId: cid, date: '', approval: 'draft', title: d.name || 'Grafika', format: d.format === 'story' ? 'Relacja' : 'Post' });
-      state.posts.push(post);
-    }
+    if (!post) { post = newPost(fresh); state.posts.push(post); }
     post.media.push(m);
     save(true);
-    toast(`Grafika dodana do treści „${post.title || 'bez tematu'}”`, 4000);
+    if (!openAfter) { toast(`Grafika dodana do treści „${post.title || 'bez tematu'}”`, 4000); return; }
+    // po przejściu do planu klienta otwieramy edytor tej treści
+    ui.month = postMonth(post) || ui.month;
+    const target = post;
+    window.addEventListener('hashchange', () => openDrawer(target), { once: true });
+    location.hash = `#/k/${target.clientId}/plan`;
   });
 }
 
@@ -259,7 +288,7 @@ function stNew(base) {
   studio.cur = { ...(base ? rest : m.start[typ]), brand: m.id, format, typ: format === 'poziom' ? 'poziom' : typ, name: base?.nazwa || base?.name || 'Nowa grafika' };
   delete studio.cur.nazwa;
   studio.dirty = false; studio.pickFoto = false;
-  if (location.hash === '#/grafiki/nowy') render(); else location.hash = '#/grafiki/nowy';
+  if (location.hash === `${stBase()}/nowy`) render(); else location.hash = `${stBase()}/nowy`;
 }
 const stLeave = () => !studio.dirty || confirm('Masz niezapisane zmiany w grafice. Wyjść bez zapisywania?');
 
@@ -267,19 +296,19 @@ document.addEventListener('click', async e => {
   const el = e.target.closest('[data-sa]'); if (!el) return;
   const a = el.dataset.sa, m = brandOf(studio.brand);
   switch (a) {
-    case 'brand': studio.brand = el.dataset.v; studio.error = ''; await loadBrand(studio.brand).catch(err => toast(err.message)); render(); break;
     case 'new': stNew(); break;
     case 'example': stNew(structuredClone(m.przyklady.zbiory[+el.dataset.z].projekty[+el.dataset.i])); break;
-    case 'open': if (!e.target.closest('.st-del')) location.hash = `#/grafiki/p/${el.dataset.id}`; break;
+    case 'open': if (!e.target.closest('.st-del')) location.hash = `${stBase()}/p/${el.dataset.id}`; break;
     case 'del': {
       const d = stDesign(el.dataset.id); if (!confirm(`Usunąć projekt „${d?.name || 'bez nazwy'}”? Grafiki dodane do treści zostaną w planie.`)) return;
       try { await api('DELETE', `/api/designs/${el.dataset.id}`); studio.designs = studio.designs.filter(x => x.id !== el.dataset.id); render(); } catch (err) { toast(err.message, 5000); }
       break;
     }
-    case 'back': if (stLeave()) { studio.dirty = false; studio.cur = null; location.hash = '#/grafiki'; } break;
+    case 'back': if (stLeave()) { studio.dirty = false; studio.cur = null; location.hash = stBase(); } break;
     case 'save': stSave(); break;
     case 'png': stPng(); break;
     case 'attach': stAttachModal(); break;
+    case 'at-mode': stAttachModal($('#stAtClient').value, el.dataset.v); break;
     case 'attach-do': stAttach(); break;
     case 'foto-toggle': studio.pickFoto = !studio.pickFoto; stRedrawForm(); break;
     case 'foto-pick': studio.cur.zdjecie = el.dataset.v; delete studio.cur.styl; stMarkDirty(); stRedrawForm(); stPaint(); break;
@@ -292,7 +321,14 @@ document.addEventListener('click', async e => {
     }
   }
 });
-document.addEventListener('change', e => { if (e.target.id === 'stAtClient') stAttachModal(e.target.value); });
+document.addEventListener('change', e => { if (e.target.id === 'stAtClient') stAttachModal(e.target.value, studio.atMode); });
+// szukanie treści w oknie „Dodaj do treści”
+document.addEventListener('input', e => {
+  if (e.target.id !== 'stAtQ') return;
+  const q = pkey(e.target.value), sel = $('#stAtPost');
+  [...sel.options].forEach(o => { o.hidden = !!q && !pkey(o.textContent).includes(q); });
+  if (sel.selectedOptions[0]?.hidden) { const f = [...sel.options].find(o => !o.hidden); if (f) f.selected = true; }
+});
 document.addEventListener('input', e => {
   const t = e.target, d = studio.cur;
   if (t.dataset.sk && d) { const [x, y] = stKadr(d); stSetKadr(t.dataset.sk === 'x' ? +t.value : x, t.dataset.sk === 'y' ? +t.value : y); return; }

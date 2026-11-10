@@ -36,6 +36,9 @@ def _client(db: Session, token: str) -> Client:
 def public_client(c: Client) -> dict:
     data = {k: c.data.get(k, "") for k in PUBLIC_CLIENT_FIELDS}
     data["pillars"] = [{k: p.get(k, "") for k in PUBLIC_PILLAR_FIELDS} for p in c.data.get("pillars") or []]
+    # tylko linki oznaczone przez agencję jako widoczne dla klienta
+    data["links"] = [{"name": str(l.get("name", "")), "url": str(l.get("url", ""))}
+                     for l in c.data.get("links") or [] if isinstance(l, dict) and l.get("shared")]
     return {**data, "id": c.id, "token": c.token}
 
 
