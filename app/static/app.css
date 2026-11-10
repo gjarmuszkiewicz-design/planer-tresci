@@ -168,6 +168,10 @@ table.plan.full{min-width:2100px}
 .pubbtn{border:1px dashed #cbd5e1;background:#fff;border-radius:999px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);white-space:nowrap}
 .pubbtn:hover{border-color:var(--pub);color:var(--pub)}
 .pubbtn.done{border:0;background:var(--pub-bg);color:var(--pub);font-weight:600}
+.pubcell{display:flex;flex-direction:column;align-items:flex-start;gap:3px}
+.pubd{border:1px solid var(--border);border-radius:6px;padding:1px 4px;font:inherit;font-size:12px;color:var(--text);background:#fff;width:118px}
+.pub-sh{font-size:11px;color:#92400e;white-space:nowrap}
+.chip .pmv{flex:none;font-size:10px;color:#92400e;text-decoration:none;margin-left:auto}
 .empty{text-align:center;padding:40px 20px;color:var(--muted)}
 .empty b{display:block;color:var(--text);font-size:15px;margin-bottom:4px}
 .notes-card textarea{min-height:110px}

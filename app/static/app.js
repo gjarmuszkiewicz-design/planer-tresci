@@ -30,6 +30,19 @@ function weeksOfMonth(mk) {
 }
 const weekRange = mon => { const s = parseYmd(mon), e = addDays(s, 6); return `${s.getDate()}.${pad(s.getMonth() + 1)} – ${e.getDate()}.${pad(e.getMonth() + 1)}`; };
 const weekNo = (mon, mk) => weeksOfMonth(mk).indexOf(mon) + 1;
+// termin z planu (dzień albo tydzień) i faktyczna data publikacji, gdy różni się od planu
+const planLabel = p => p.date ? fmtShort(p.date) + (p.time ? ' ' + p.time : '')
+  : p.week ? `Tydzień ${weekNo(p.week, postMonth(p)) || ''} (${weekRange(p.week)})` : 'rezerwa';
+function pubShift(p) {
+  if (!p.published || !p.publishedAt) return '';
+  const d = parseYmd(p.publishedAt);
+  if (p.date) {
+    const n = Math.round((d - parseYmd(p.date)) / 864e5), a = Math.abs(n);
+    return n ? `${a} ${a === 1 ? 'dzień' : 'dni'} ${n > 0 ? 'po planie' : 'przed planem'}` : '';
+  }
+  if (p.week) { const s = parseYmd(p.week); return d < s ? 'przed planowanym tygodniem' : d > addDays(s, 6) ? 'po planowanym tygodniu' : ''; }
+  return 'spoza planu (rezerwa)';
+}
 const pkey = s => String(s || '').toUpperCase().replace(/Ł/g, 'L').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Z0-9]/g, '');
 const sentence = s => { s = String(s || '').trim(); return s === s.toUpperCase() ? s.charAt(0) + s.slice(1).toLowerCase() : s; };
 
@@ -500,11 +513,16 @@ function mediaCell(p) {
   return t ? `<span class="thumb" style="padding:0"><img src="${esc(t)}" style="width:100%;height:100%;object-fit:cover;border-radius:7px" onerror="this.replaceWith(document.createTextNode('🔗'))">${p.media.length > 1 ? `<span class="n">${p.media.length}</span>` : ''}</span>` : `<span class="thumb">🔗</span>`;
 }
 function pubCell(p) {
-  if (!p.date) return `<span class="small faint">—</span>`;
-  return `<button class="pubbtn ${p.published ? 'done' : ''}" data-act="toggle-pub" data-id="${p.id}" title="Kliknij, aby zmienić">${p.published ? '✓ Opublikowano ' + fmtShort(p.publishedAt) : (p.date < TODAY ? '⚠ Oczekuje' : 'Oczekuje')}</button>`;
+  if (!p.date && !p.week && !p.published) return `<span class="small faint">—</span>`;
+  const late = p.date ? p.date < TODAY : p.week ? ymd(addDays(parseYmd(p.week), 6)) < TODAY : false;
+  if (!p.published) return `<button class="pubbtn" data-act="toggle-pub" data-id="${p.id}" title="Kliknij, aby oznaczyć jako opublikowane">${late ? '⚠ Oczekuje' : 'Oczekuje'}</button>`;
+  const sh = pubShift(p);
+  return `<div class="pubcell"><button class="pubbtn done" data-act="toggle-pub" data-id="${p.id}" title="Kliknij, aby cofnąć do „Oczekuje”">✓ Opublikowano</button>
+    <input type="date" class="pubd" data-act="pub-date" data-pubd="${p.id}" value="${esc(p.publishedAt)}" title="Faktyczna data publikacji – zmień, jeśli różni się od planu">
+    ${sh ? `<div class="pub-sh" title="Plan: ${esc(planLabel(p))}">↪ ${esc(sh)}</div>` : ''}</div>`;
 }
 function dateCell(p) {
-  if (!p.date) return `<td class="date"><span class="faint" style="font-weight:500">${p.week ? 'w tygodniu' : 'rezerwa'}</span></td>`;
+  if (!p.date) return `<td class="date">${p.week ? `<span style="font-weight:600">Tydz. ${weekNo(p.week, postMonth(p)) || ''}</span><small>${weekRange(p.week)}</small>` : '<span class="faint" style="font-weight:500">rezerwa</span>'}</td>`;
   const d = parseYmd(p.date);
   return `<td class="date">${fmtShort(p.date)}${p.time ? ` <span class="muted" style="font-weight:400">${esc(p.time)}</span>` : ''}<small>${DOW[(d.getDay() + 6) % 7]}</small></td>`;
 }
@@ -575,8 +593,10 @@ function viewTable(c) {
 function chip(p, editable, tbd) {
   const c = clientById(p.clientId);
   const pc = pillarOf(c, p.pillar)?.color;
-  return `<div class="chip ${p.approval} ${p.published ? 'pub' : ''} ${tbd ? 'tbd' : ''}" ${editable ? 'draggable="true"' : ''} data-act="${editable ? 'open-post' : 'portal-jump'}" data-id="${p.id}" title="${esc(p.title)}${p.pillar ? ' · ' + esc(p.pillar) : ''}${tbd ? ' · dzień do ustalenia' : ''}">
-    ${p.meta ? ICON.ig : ''}${p.li ? ICON.li : ''}${pc ? `<span class="pd" style="background:${esc(pc)}"></span>` : ''}${p.time ? `<span class="tm">${esc(p.time)}</span>` : ''}<span class="t">${esc(p.title || p.format)}</span>${p.unread && editable ? '<span class="newdot"></span>' : ''}</div>`;
+  const sh = pubShift(p), moved = !!sh;
+  const tip = `${esc(p.title)}${p.pillar ? ' · ' + esc(p.pillar) : ''}${tbd ? ' · dzień do ustalenia' : ''}${p.published && p.publishedAt ? ` · plan: ${esc(planLabel(p))} · opublikowano ${fmtShort(p.publishedAt)}${sh ? ' (' + esc(sh) + ')' : ''}` : ''}`;
+  return `<div class="chip ${p.approval} ${p.published ? 'pub' : ''} ${tbd ? 'tbd' : ''}" ${editable ? 'draggable="true"' : ''} data-act="${editable ? 'open-post' : 'portal-jump'}" data-id="${p.id}" title="${tip}">
+    ${p.meta ? ICON.ig : ''}${p.li ? ICON.li : ''}${pc ? `<span class="pd" style="background:${esc(pc)}"></span>` : ''}${p.time ? `<span class="tm">${esc(p.time)}</span>` : ''}<span class="t">${esc(p.title || p.format)}</span>${moved ? `<span class="pmv">↪ ${fmtShort(p.publishedAt)}</span>` : ''}${p.unread && editable ? '<span class="newdot"></span>' : ''}</div>`;
 }
 const WEEK_SLOTS = { 1: [0], 2: [1, 2], 3: [0, 2, 4], 4: [0, 1, 3, 4], 5: [0, 1, 2, 3, 4] };
 function calendarGrid(c, posts, mk, editable) {
@@ -588,7 +608,11 @@ function calendarGrid(c, posts, mk, editable) {
   const by = {}; posts.filter(p => p.date).forEach(p => (by[p.date] ||= []).push(p));
   // treści z tygodniem bez dnia: rozkładamy na dni tygodnia (pon / wt śr / pon śr pt …), dzień jest tylko orientacyjny
   const tbd = new Set(), weekly = {};
-  posts.filter(p => !p.date && p.week).forEach(p => (weekly[p.week] ||= []).push(p));
+  posts.filter(p => !p.date && p.week).forEach(p => {
+    const pd = p.published && p.publishedAt, wEnd = ymd(addDays(parseYmd(p.week), 6));
+    if (pd && p.publishedAt >= p.week && p.publishedAt <= wEnd) (by[p.publishedAt] ||= []).push(p);
+    else (weekly[p.week] ||= []).push(p);
+  });
   Object.entries(weekly).forEach(([w, list]) => {
     const n = list.length, slots = WEEK_SLOTS[n] || list.map((_, i) => Math.floor(i * 5 / n));
     sortPosts(list).forEach((p, i) => { const k = ymd(addDays(parseYmd(w), slots[i])); (by[k] ||= []).push(p); tbd.add(p); });
@@ -992,7 +1016,8 @@ function renderDrawer() {
           <div class="field"><label>Akceptacja klienta</label><select class="select" data-f="approval">${Object.entries(APPROVAL).map(([k, v]) => opt(k, d.approval, v.label + (k === 'draft' ? ' (niewidoczny dla klienta)' : ''))).join('')}</select></div>
           <div class="field"><label>Publikacja</label><div class="row">
             <select class="select" data-f="published"><option value="0" ${!d.published ? 'selected' : ''}>Oczekuje</option><option value="1" ${d.published ? 'selected' : ''}>Opublikowano</option></select>
-            ${d.published ? `<input type="date" class="input" data-f="publishedAt" value="${esc(d.publishedAt)}" title="Data publikacji">` : ''}</div></div>
+            ${d.published ? `<input type="date" class="input" data-f="publishedAt" value="${esc(d.publishedAt)}" title="Faktyczna data publikacji">` : ''}</div>
+            ${d.published ? `<div class="small muted" style="margin-top:4px">Plan: ${esc(planLabel(d))}${pubShift(d) ? ` · <b style="color:#92400e">opublikowano ${esc(pubShift(d))}</b>` : ''}</div>` : ''}</div>
         </div>
         <div class="field"><label>Notatka wewnętrzna <span class="hint">· klient jej nie widzi</span></label><textarea class="input" data-f="note" rows="2" style="min-height:48px">${esc(d.note)}</textarea></div>
 
@@ -1071,7 +1096,7 @@ function viewPortal(token) {
       ${tabs.length > 1 ? `<div class="seg">${tabs.map((t, i) => `<button class="${i ? '' : 'on'}" data-act="ppv" data-id="${p.id}" data-v="${t}"><span class="ch">${PV_LABEL[t][0]}</span>${PV_LABEL[t][1]}</button>`).join('')}</div>` : ''}
       <div data-pv="${p.id}" style="display:flex;justify-content:center;width:100%">${previewFor(p, c, tabs[0])}</div>${slidesStrip(p)}</div></div>
     <div class="r">
-      <div class="meta"><span class="when">${p.date ? `${fmtDay(p.date)}${p.time ? ', ' + esc(p.time) : ''}` : p.week ? `Tydzień ${weekNo(p.week, ui.month)} · dzień do ustalenia` : 'Rezerwa'}</span><span class="grow"></span>${badge(p.approval)}${p.published ? `<span class="badge s-pub">Opublikowano ${fmtShort(p.publishedAt)}</span>` : ''}</div>
+      <div class="meta"><span class="when">${p.date ? `${fmtDay(p.date)}${p.time ? ', ' + esc(p.time) : ''}` : p.week ? `Tydzień ${weekNo(p.week, postMonth(p))} (${weekRange(p.week)})${p.published ? '' : ' · dzień do ustalenia'}` : 'Rezerwa'}</span><span class="grow"></span>${badge(p.approval)}${p.published ? `<span class="badge s-pub" title="${pubShift(p) ? esc('Opublikowano ' + pubShift(p)) : ''}">Opublikowano ${p.publishedAt ? fmtDay(p.publishedAt) : ''}</span>` : ''}</div>
       <div class="meta small muted"><span class="ch">${chIcons(p)} ${chLabel(p)}</span>· ${esc(p.format)}${p.pillar ? ' · ' + pillarChip(c, p.pillar) : ''}</div>
       ${p.title ? `<div style="font-weight:650;font-size:15px">${esc(p.title)}</div>` : ''}
       ${p.toConfirm ? `<div class="ask"><b>❓ Do potwierdzenia:</b> ${esc(p.toConfirm)}</div>` : ''}
@@ -1767,6 +1792,7 @@ document.addEventListener('click', async e => {
     case 'user-toggle': toggleUser(+id); break;
     case 'user-reset': resetUser(+id); break;
     case 'password-save': savePassword(); break;
+    case 'pub-date': break;
     case 'toggle-pub': {
       e.stopPropagation();
       const p = state.posts.find(x => x.id === id); p.published = !p.published; p.publishedAt = p.published ? TODAY : '';
@@ -1855,7 +1881,7 @@ document.addEventListener('input', e => {
     drawer.dirty = true;
     if (k === 'date' && t.value) d.month = t.value.slice(0, 7);
     if (k === 'month' && t.value && d.week && !weeksOfMonth(t.value).includes(d.week)) d.week = weeksOfMonth(t.value)[0];
-    if (['published', 'clientId', 'approval', 'pillar', 'month'].includes(k)) { if (k === 'published' && d.published && !d.publishedAt) d.publishedAt = TODAY; renderDrawerKeepScroll(); }
+    if (['published', 'publishedAt', 'clientId', 'approval', 'pillar', 'month'].includes(k)) { if (k === 'published' && d.published && !d.publishedAt) d.publishedAt = TODAY; renderDrawerKeepScroll(); }
     else refreshPreview();
     if (k === 'copyMeta' || k === 'copyLi') { const tab = $(`.captabs [data-v="${k === 'copyLi' ? 'li' : 'meta'}"] .dot`); if (tab && t.value.trim()) tab.remove(); }
     return;
@@ -1881,6 +1907,11 @@ function rerenderKeepFocus(t, sel, ms = 600) {
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.dataset.bind === 'st') { ui.st = t.value; render(); return; }
+  if (t.dataset.pubd) {
+    const p = state.posts.find(x => x.id === t.dataset.pubd);
+    if (p && t.value) { p.publishedAt = t.value; save(); render(); toast(`Data publikacji: ${fmtShort(t.value)}`); }
+    return;
+  }
   if (!imp) return;
   if (t.id === 'impClient') { imp.client = t.value; renderImport(); }
   else if (t.id === 'impReplace') imp.replace = t.checked;
