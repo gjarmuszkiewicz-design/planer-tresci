@@ -172,6 +172,22 @@ def test_designs_and_brand_files_only_for_agency(client):
     assert client.get("/api/designs").json() == []
 
 
+def test_client_brand_system_file(client):
+    # wspólny układ pliku systemu identyfikacji: wzór i szablony tylko dla zespołu, plik klienta nie trafia do panelu klienta
+    anon = TestClient(app)
+    assert anon.get("/marki/wspolny/wzor-system-social.json").status_code == 401
+    assert anon.get("/marki/wspolny/system.js").status_code == 401
+    wzor = client.get("/marki/wspolny/wzor-system-social.json").json()
+    assert wzor["typ"] == "system-social" and wzor["wersja"] == 1
+    assert {"ciemny", "jasny", "akcent", "tlo"} <= set(wzor["kolory"]) and wzor["fonty"]["tytul"]["rodzina"]
+    assert "systemZPliku" in client.get("/marki/wspolny/system.js").text
+    client.post("/api/sync", json={"clients": [{"id": "klient01", "token": TOKEN, "name": "Kawiarnia", "brand": "plik",
+                                                "system": {**wzor, "marka": {"nazwa": "TAJNY system"}}}]})
+    assert "TAJNY" not in TestClient(app).get(f"/api/p/{TOKEN}").text
+    # projekty z własnego systemu klienta mają markę k-<id klienta>
+    assert client.put("/api/designs/proj0003", json={"brand": "k-klient01", "data": {"format": "post", "typ": "okladka"}}).status_code == 200
+
+
 def test_ai_assistant(client, monkeypatch):
     from types import SimpleNamespace
 

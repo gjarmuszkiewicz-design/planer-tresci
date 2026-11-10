@@ -15,7 +15,7 @@ Jedno miejsce na plany treści wszystkich klientów: tabela jak w Excelu, kalend
 | **Profil klienta** | Konta, zasady publikacji, ton, stałe hashtagi, filary z opisem (cel, grupa, co publikujemy, przykłady) |
 | **Panel klienta** | Link `/p/<token>` bez logowania: plan z tematami tygodni, podgląd każdej treści, „Akceptuję” / „Poproś o zmiany”, komentarze. Serwer nie wysyła klientowi szkiców, notatek wewnętrznych ani ustawień agencji |
 | **Import z Excela** | Wspólny schemat (niżej) oraz starsze plany (układ Lion i see, arkusz LinkedIn, „Opis filarów”), grafiki wklejone w arkusz, tygodnie, rezerwę i uwagi; podgląd przed importem z dopasowaniem kolumn |
-| **Grafiki** | Zakładka „Grafiki” u klienta, któremu w profilu włączono moduł Grafiki z systemem identyfikacji marki (na razie WIZme – agencja jako klient). Tylko dla zespołu agencji (panel klienta nie ma dostępu). Projekty w systemie identyfikacji marki – na start WIZme: post, relacja / okładka rolki, grafika pozioma, okładka Facebooka, banery LinkedIn, awatar i okładki wyróżnionych relacji. Gotowe projekty i wzorce z systemu jako punkt wyjścia, przykładowe zdjęcia, kadr ustawiany przeciągnięciem, zapis projektów, pobranie PNG i dodanie grafiki do istniejącej treści albo do nowej (data, format, kanały) z od razu otwartym edytorem treści |
+| **Grafiki** | Zakładka „Grafiki” i przycisk „＋ Nowa grafika” u klienta, któremu w profilu włączono moduł Grafiki. Klient WIZme ma wbudowany system WIZme, każdy inny klient – własny system wgrany z pliku (wspólny układ pliku, niżej). Tylko dla zespołu agencji (panel klienta nie ma dostępu). Projekty w systemie identyfikacji marki – na start WIZme: post, relacja / okładka rolki, grafika pozioma, okładka Facebooka, banery LinkedIn, awatar i okładki wyróżnionych relacji. Gotowe projekty i wzorce z systemu jako punkt wyjścia, przykładowe zdjęcia, kadr ustawiany przeciągnięciem, zapis projektów, pobranie PNG i dodanie grafiki do istniejącej treści albo do nowej (data, format, kanały) z od razu otwartym edytorem treści |
 | **Linki klienta** | Tylko dla zespołu agencji. Dodaje się je w zakładce „Profil, filary i ustawienia” (Dysk Google, materiały od klienta, Canva…), a pod nazwą klienta są pod ręką na każdej zakładce. Panel klienta ich nie dostaje |
 | **Asystent AI** | Tylko dla zespołu, działa po dodaniu klucza Claude API. „Zaplanuj z AI” układa tematy tygodni i treści na miesiąc ze strategii klienta (filary, ton, grupa, zasady, pełny dokument strategii), z uwzględnieniem tego, co już jest w planie i co było publikowane. Propozycje zaznaczasz i dodajesz jako szkice, opcjonalnie od razu z opisami. W edytorze treści „Napisz / Popraw z AI” pisze opisy FB + IG i LinkedIn, CTA, hashtagi, tekst na grafikę i brief dla grafika; wynik widać przed wstawieniem. W profilu „Wczytaj strategię z PDF” uzupełnia puste pola strategii i dodaje brakujące filary |
 | **Eksport do Excela** | Plik we wspólnym schemacie, z miniaturami grafik. Przycisk „Pusty szablon” daje ten sam układ bez treści, z filarami klienta |
@@ -50,6 +50,28 @@ przykładowymi zdjęciami i listą gotowych projektów (`przyklady.json`). Pliki
 Szablony WIZme przeniesiono 1:1 z generatora `system-social-wizme/generuj.js`, a gotowe projekty z jego `posty.json`.
 Grafika powstaje w przeglądarce (ramka z kodem marki + biblioteka html-to-image), więc serwer nie potrzebuje Chrome.
 Nową markę dodaje się jako nowy katalog i wpis w `app/marki/marki.json`.
+
+### Plik systemu identyfikacji klienta (`system-social.json`)
+
+Każdy klient poza WIZme dostaje grafiki z jednego, wspólnego układu pliku. Plik powstaje przy budowie systemu komunikacji
+wizualnej na social media i niesie tylko wygląd marki; szablony (okładka na zdjęciu, slajd z treścią, cytat, liczba,
+zdjęcie z podpisem, zaproszenie, logo, awatar, okładka wyróżnionej, grafika pozioma, banery), formaty i strefy bezpieczne
+są wspólne (`app/marki/wspolny/system.js`). Wgrywa się go w profilu klienta: **Moduł Grafiki → Własny system klienta z pliku**.
+Wzór do pobrania jest tam pod przyciskiem „Wzór pliku” (`app/marki/wspolny/wzor-system-social.json`).
+
+| Pole | Wymagane | Opis |
+|---|---|---|
+| `typ`, `wersja` | tak | zawsze `"system-social"` i `1` |
+| `marka.nazwa` | tak | nazwa marki; `marka.konto` (np. `@konto`) i `marka.www` opcjonalnie |
+| `kolory.ciemny`, `.jasny`, `.akcent`, `.tlo` | tak | `#RRGGBB`: tło ciemne, tekst na ciemnym, akcent (etykiety, wyróżnione słowa, linie, przycisk), jasne tło slajdów z treścią; `kolory.akcentTekst` – tekst na tle akcentu (domyślnie ciemny) |
+| `fonty.tytul`, `fonty.tekst` | tak | `{"rodzina": "Playfair Display", "waga": 700, "wersaliki": false}`; `fonty.google` – adres CSS z fonts.googleapis.com z tymi krojami |
+| `logo.naCiemnym`, `.naJasnym`, `.znak` | nie | obraz jako `data:image/svg+xml;base64,…` (także PNG, JPG, WEBP) albo adres `https://`; znak = sygnet do awatara. Bez logo stopka pokazuje nazwę marki |
+| `styl` | nie | `zaokraglenie` (px), `etykieta` (`"tekst"` albo `"pigulka"`), `linia` (linia pod tytułem), `cien` (siła przyciemnienia zdjęcia 0–1) |
+| `teksty.stopka`, `teksty.cta` | nie | tekst w stopce (domyślnie konto) i domyślny napis na przycisku |
+| `zdjecia` | nie | lista adresów zdjęć marki do wyboru w edytorze |
+
+Aplikacja sprawdza plik przy wgrywaniu i pokazuje, czego brakuje. Duże logo rastrowe zapisuje w grafikach aplikacji.
+Plik klienta nie trafia do panelu klienta.
 
 ## Wdrożenie na Railway
 

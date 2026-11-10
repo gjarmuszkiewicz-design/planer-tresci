@@ -16,6 +16,14 @@ function loadScript(src) {
   return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('Nie udało się wczytać systemu marki')); document.head.appendChild(s); });
 }
 async function loadBrand(id) {
+  // własny system klienta z pliku (wspólne szablony z /marki/wspolny/system.js)
+  if (id.startsWith('k-')) {
+    const c = clientById(id.slice(2));
+    if (!c?.system) throw new Error('Klient nie ma wczytanego pliku systemu identyfikacji');
+    if (!window.systemZPliku) await loadScript('/marki/wspolny/system.js');
+    if (brandOf(id)?.zrodlo !== c.system.wczytano) systemZPliku(c.system, id);
+    return;
+  }
   if (brandOf(id)?.przyklady) return;
   if (!brandOf(id)) await loadScript(`/marki/${id}/marka.js`);
   await brandOf(id).init();
@@ -24,7 +32,7 @@ function studioLoad() {
   studio.loading ||= (async () => {
     try {
       studio.brands ||= await api('GET', '/marki/marki.json');
-      if (!studio.brands.some(b => b.id === studio.brand)) studio.brand = studio.brands[0]?.id;
+      if (!studio.brand.startsWith('k-') && !studio.brands.some(b => b.id === studio.brand)) studio.brand = studio.brands[0]?.id;
       await loadBrand(studio.brand);
       studio.designs ||= await api('GET', '/api/designs');
       studio.error = '';
@@ -40,7 +48,9 @@ function studioLoad() {
 function viewStudio(r, c) {
   studio.cid = c.id;
   if (studio.brand !== clientBrand(c)) { studio.brand = clientBrand(c); studio.loading = null; }
-  if (!studio.designs || !brandOf(studio.brand)?.przyklady) {
+  const stale = studio.brand.startsWith('k-') && brandOf(studio.brand) && brandOf(studio.brand).zrodlo !== c.system?.wczytano;
+  if (stale) studio.loading = null;
+  if (!studio.designs || !brandOf(studio.brand)?.przyklady || stale) {
     if (!studio.error && !studio.loading) studioLoad();
     return `<div class="empty">${studio.error ? `<b>Nie udało się otworzyć modułu Grafiki</b>${esc(studio.error)}` : 'Wczytuję system identyfikacji…'}</div>`;
   }
@@ -54,6 +64,7 @@ function viewStudio(r, c) {
     if (studio.cur?.id !== d.id) { studio.cur = structuredClone(d); studio.dirty = false; }
     return stEditor();
   }
+  if (studio.wantNew) { studio.wantNew = false; setTimeout(stNew); }
   return stGallery();
 }
 
@@ -91,7 +102,7 @@ function stField(m, d, k) {
   if (f.typ === 'foto') {
     const photos = m.przyklady.zdjecia;
     return `<div class="field">${label}<div class="st-foto">${d.zdjecie ? `<img src="${esc(m.miniatura(d.zdjecie))}" alt="">` : '<span class="st-nofoto">brak zdjęcia</span>'}
-        <div class="col"><button class="btn sm" data-sa="foto-up">⤒ Wgraj zdjęcie</button><button class="btn sm ghost" data-sa="foto-toggle">${studio.pickFoto ? 'Ukryj przykładowe' : 'Wybierz z przykładowych'}</button></div></div>
+        <div class="col"><button class="btn sm" data-sa="foto-up">⤒ Wgraj zdjęcie</button>${photos.length ? `<button class="btn sm ghost" data-sa="foto-toggle">${studio.pickFoto ? 'Ukryj przykładowe' : 'Wybierz z przykładowych'}</button>` : ''}</div></div>
       ${studio.pickFoto ? `<div class="st-photos">${photos.map(n => `<img src="${esc(m.miniatura(n))}" alt="" title="${esc(n)}" class="${n === d.zdjecie ? 'on' : ''}" data-sa="foto-pick" data-v="${esc(n)}" loading="lazy">`).join('')}</div>` : ''}</div>`;
   }
   return `<div class="field">${label}<input class="input" data-sf="${k}" value="${esc(v)}"></div>`;
@@ -133,7 +144,7 @@ function stMountFrame() {
   studio.frame = null;
   const fr = document.createElement('iframe');
   fr.className = 'st-frame'; fr.width = f.w; fr.height = f.h; fr.setAttribute('scrolling', 'no'); fr.title = 'Podgląd grafiki';
-  fr.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="${m.fonty}"><style>${m.css}</style><script src="/static/vendor/html-to-image.js"><\/script></head><body></body></html>`;
+  fr.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="${m.fonty}" crossorigin="anonymous"><style>${m.css}</style><script src="/static/vendor/html-to-image.js"><\/script></head><body></body></html>`;
   fr.onload = () => { if (studio.cur === d) { studio.frame = fr; stPaint(); } };
   host.innerHTML = ''; host.appendChild(fr);
   stFit();
@@ -297,6 +308,14 @@ document.addEventListener('click', async e => {
   const a = el.dataset.sa, m = brandOf(studio.brand);
   switch (a) {
     case 'new': stNew(); break;
+    // „＋ Nowa grafika” w górnym pasku klienta: od razu nowy projekt w jego systemie
+    case 'new-top': {
+      const r = route();
+      if (r.name === 'client' && r.tab === 'grafiki' && studio.cid === el.dataset.client && brandOf(studio.brand)?.przyklady) stNew();
+      else if (r.name === 'studio' && studio.cid === el.dataset.client) { if (stLeave()) stNew(); }
+      else { studio.wantNew = true; location.hash = `#/k/${el.dataset.client}/grafiki`; }
+      break;
+    }
     case 'example': stNew(structuredClone(m.przyklady.zbiory[+el.dataset.z].projekty[+el.dataset.i])); break;
     case 'open': if (!e.target.closest('.st-del')) location.hash = `${stBase()}/p/${el.dataset.id}`; break;
     case 'del': {

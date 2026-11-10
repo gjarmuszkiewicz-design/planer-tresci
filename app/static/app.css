@@ -514,3 +514,7 @@ table.plan.full{min-width:2100px}
 .lk-row .lk-sp{width:30px}
 @media (max-width:700px){.lk-row{grid-template-columns:1fr auto auto}.lk-row input:first-child{grid-column:1/-1}}
 a.lnk-add{text-decoration:none;display:inline-block}
+.sys-box{margin-top:8px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fafafc}
+.sys-kol{display:flex;align-items:center;gap:6px;margin-top:6px}
+.sys-kol i{width:22px;height:22px;border-radius:6px;border:1px solid #0002;display:inline-block}
+.sys-kol span{margin-left:6px}

@@ -337,11 +337,12 @@ function viewDash() {
 }
 
 /* ================= linki do materiałów i moduł Grafiki (tylko panel agencji) ================= */
-// Grafiki włącza się w profilu klienta (pole brand: id systemu identyfikacji albo 'none').
-// Klient bez tego ustawienia, którego nazwa zawiera nazwę marki (np. WIZme), dostaje zakładkę jak dotąd.
+// Moduł Grafiki włącza się w profilu klienta (pole brand):
+//  'plik' – własny system klienta z wgranego pliku system-social.json (wspólny układ dla każdego klienta),
+//  'none' – wyłączony. Wbudowany system (app/marki, np. WIZme) dostaje tylko klient tej marki (po nazwie).
 const brandList = () => studio.brands || [{ id: 'wizme', nazwa: 'WIZme' }];
-const clientBrand = c => c.brand === 'none' ? ''
-  : brandList().find(b => c.brand ? c.brand === b.id : pkey(c.name).includes(pkey(b.nazwa)))?.id || '';
+const ownBrand = c => brandList().find(b => pkey(c.name).includes(pkey(b.nazwa)))?.id || '';
+const clientBrand = c => c.brand === 'none' ? '' : c.brand === 'plik' ? (c.system ? 'k-' + c.id : '') : ownBrand(c);
 // dawne pole „Folder z materiałami” pokazujemy jako pierwszy link, dopóki ktoś nie zmieni listy
 const linksOf = c => c.links || (c.drive ? [{ name: 'Folder z materiałami', url: c.drive }] : []);
 const safeUrl = u => /^https?:\/\//i.test(u) ? u : 'https://' + String(u).replace(/^[a-z][\w+.-]*:\/*/i, '');
@@ -384,6 +385,48 @@ document.addEventListener('input', e => {
 // po zmianie adresu odświeżamy przycisk „otwórz” i pasek linków
 document.addEventListener('change', e => { if (e.target.dataset.lfield) rerenderKeepFocus(e.target, `[data-lfield="${e.target.dataset.lfield}"]`); });
 
+function brandField(c) {
+  const own = ownBrand(c), v = c.brand === 'plik' ? 'plik' : c.brand === 'none' || !own ? 'none' : own;
+  const s = c.system;
+  return `<div class="field"><label>Moduł Grafiki <span class="hint">· projekty w systemie identyfikacji marki, tylko dla zespołu</span></label>
+    <select class="select" data-cfield="brand"><option value="none" ${v === 'none' ? 'selected' : ''}>Wyłączony</option>${own
+      ? `<option value="${esc(own)}" ${v === own ? 'selected' : ''}>System identyfikacji ${esc(brandList().find(b => b.id === own).nazwa)} (wbudowany)</option>` : ''}
+      <option value="plik" ${v === 'plik' ? 'selected' : ''}>Własny system klienta z pliku</option></select>
+    ${v === 'plik' ? `<div class="sys-box">${s
+      ? `<div><b>✓ ${esc(s.marka.nazwa)}</b> <span class="small muted">· plik ${esc(s.plik || '')}, wczytany ${fmtTs(s.wczytano)}</span></div>
+         <div class="sys-kol">${['ciemny', 'jasny', 'akcent', 'tlo'].map(k => `<i style="background:${esc(s.kolory[k])}" title="${k} ${esc(s.kolory[k])}"></i>`).join('')}<span class="small muted">${esc(s.fonty.tytul.rodzina)} · ${esc(s.fonty.tekst.rodzina)}</span></div>`
+      : '<div class="small muted">Wgraj plik systemu identyfikacji wygenerowany pod social media (system-social.json). Wszyscy klienci mają ten sam układ pliku.</div>'}
+      <div class="row wrap" style="gap:6px;margin-top:8px"><button class="btn sm" data-act="sys-upload">⤒ ${s ? 'Wgraj nowy plik' : 'Wgraj plik systemu'}</button>
+        ${s ? '<button class="btn sm ghost" data-act="sys-download">⤓ Pobierz obecny</button>' : ''}<a class="btn sm ghost" href="/marki/wspolny/wzor-system-social.json" download="wzor-system-social.json">Wzór pliku</a></div></div>` : ''}</div>`;
+}
+// wgranie pliku systemu: sprawdzenie układu, duże logo rastrowe trafia do /media, żeby stan klienta był lekki
+async function uploadSystem(c) {
+  const [f] = await pickFiles('.json,application/json', false); if (!f) return;
+  try {
+    if (f.size > 3e6) throw new Error('Plik jest za duży (maks. 3 MB).');
+    let raw; try { raw = JSON.parse(await f.text()); } catch { throw new Error('To nie jest poprawny plik JSON.'); }
+    if (!window.sprawdzSystem) await loadScript('/marki/wspolny/system.js');
+    const { system, blad } = sprawdzSystem(raw);
+    if (blad) throw new Error(blad);
+    for (const k of ['naCiemnym', 'naJasnym', 'znak']) {
+      const v = system.logo[k];
+      if (/^data:image\/(png|jpeg|webp)/.test(v) && v.length > 60000) system.logo[k] = (await blobToMedia(await (await fetch(v)).blob(), `logo-${k}.png`, 1200)).src;
+      else if (v.startsWith('data:') && v.length > 400000) throw new Error(`Logo „${k}” jest za duże – zmniejsz je albo podaj adres pliku.`);
+    }
+    c.system = { ...system, plik: f.name.slice(0, 80), wczytano: Date.now() };
+    c.brand = 'plik';
+    save(); render(); toast(`Wczytano system identyfikacji „${system.marka.nazwa}”`, 4000);
+  } catch (e) { toast(e.message, 7000); }
+}
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act="sys-upload"], [data-act="sys-download"]'); if (!el || PORTAL_TOKEN) return;
+  const c = clientById(route().id); if (!c) return;
+  if (el.dataset.act === 'sys-upload') return uploadSystem(c);
+  const { plik, wczytano, ...s } = c.system;
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(s, null, 2)], { type: 'application/json' }));
+  a.download = plik || 'system-social.json'; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+});
+
 /* ================= client views ================= */
 function viewClient(c, tab) {
   const brand = clientBrand(c);
@@ -400,6 +443,7 @@ function viewClient(c, tab) {
       <div class="grow"></div>
       <button class="btn" data-act="share" data-id="${c.id}">🔗 Link dla klienta</button>
       ${aiUi(`data-ai="plan-open" data-client="${c.id}"`, 'Zaplanuj z AI')}
+      ${brand ? `<button class="btn" data-sa="new-top" data-client="${c.id}">＋ Nowa grafika</button>` : ''}
       <button class="btn primary" data-act="new-post" data-client="${c.id}">＋ Nowa treść</button></div>
     ${linksBar(c)}
     <div class="tabs">${tabs.map(([k, l]) => `<a href="#/k/${c.id}/${k}" class="${tab === k ? 'active' : ''}">${l}</a>`).join('')}</div>
@@ -601,9 +645,7 @@ function viewProfile(c) {
         <label class="row small muted" style="gap:6px">Kolor <input type="color" data-cfield="color" value="${esc(c.color)}" style="width:34px;height:26px;border:0;padding:0;background:none"></label></div></div>
       ${f('name', 'Nazwa klienta')}
       ${f('contact', 'Osoba kontaktowa / akceptująca', 'np. Anna Nowak – marketing')}
-      <div class="field"><label>Moduł Grafiki <span class="hint">· projekty w systemie identyfikacji marki, tylko dla zespołu</span></label>
-        <select class="select" data-cfield="brand"><option value="none" ${!clientBrand(c) ? 'selected' : ''}>Wyłączony</option>${brandList().map(b =>
-          `<option value="${esc(b.id)}" ${clientBrand(c) === b.id ? 'selected' : ''}>System identyfikacji ${esc(b.nazwa)}</option>`).join('')}</select></div>
+      ${brandField(c)}
       ${f('notes', 'Notatki wewnętrzne', 'Wytyczne, zakazy, ustalenia…', 'textarea')}
     </div></div>
     <div class="card"><div class="card-h"><h3>Profile w social media</h3></div><div class="card-b">
