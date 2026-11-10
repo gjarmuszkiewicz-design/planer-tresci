@@ -510,3 +510,7 @@ table.plan.full{min-width:2100px}
 .lnk-add:hover{border-color:var(--accent);color:var(--accent)}
 .portal .links-bar{margin:0 0 14px}
 .studio.st-in .st-head{align-items:center;margin-bottom:4px}
+.lk-row{display:grid;grid-template-columns:minmax(140px,1fr) 2fr auto auto;gap:8px;align-items:center;margin-bottom:8px}
+.lk-row .lk-sp{width:30px}
+@media (max-width:700px){.lk-row{grid-template-columns:1fr auto auto}.lk-row input:first-child{grid-column:1/-1}}
+a.lnk-add{text-decoration:none;display:inline-block}

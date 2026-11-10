@@ -336,48 +336,53 @@ function viewDash() {
   </div>`;
 }
 
-/* ================= linki do materiałów klienta ================= */
-// klient z systemem identyfikacji (app/marki) dostaje zakładkę Grafiki – na razie dopasowanie po nazwie marki
-const clientBrand = c => (studio.brands || [{ id: 'wizme', nazwa: 'WIZme' }])
-  .find(b => c.brand === b.id || pkey(c.name).includes(pkey(b.nazwa)))?.id || '';
+/* ================= linki do materiałów i moduł Grafiki (tylko panel agencji) ================= */
+// Grafiki włącza się w profilu klienta (pole brand: id systemu identyfikacji albo 'none').
+// Klient bez tego ustawienia, którego nazwa zawiera nazwę marki (np. WIZme), dostaje zakładkę jak dotąd.
+const brandList = () => studio.brands || [{ id: 'wizme', nazwa: 'WIZme' }];
+const clientBrand = c => c.brand === 'none' ? ''
+  : brandList().find(b => c.brand ? c.brand === b.id : pkey(c.name).includes(pkey(b.nazwa)))?.id || '';
 // dawne pole „Folder z materiałami” pokazujemy jako pierwszy link, dopóki ktoś nie zmieni listy
-const linksOf = c => c.links || (c.drive ? [{ name: 'Folder z materiałami', url: c.drive, shared: false }] : []);
+const linksOf = c => c.links || (c.drive ? [{ name: 'Folder z materiałami', url: c.drive }] : []);
 const safeUrl = u => /^https?:\/\//i.test(u) ? u : 'https://' + String(u).replace(/^[a-z][\w+.-]*:\/*/i, '');
-function linksBar(c, editable) {
-  const ls = editable ? linksOf(c) : (c.links || []);
-  if (!editable && !ls.length) return '';
-  return `<div class="links-bar"><span class="lb-l">${ICON.link} Linki</span>${ls.map((l, i) => `<span class="lnk"><a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener" title="${esc(l.url)}">${esc(l.name || linkName(l.url))}</a>${editable
-      ? `${l.shared ? '<span class="lnk-sh" title="Klient widzi ten link w swoim panelu">klient</span>' : ''}<button data-act="link-edit" data-i="${i}" title="Edytuj lub usuń">✎</button>` : ''}</span>`).join('')}${editable
-    ? `<button class="lnk-add" data-act="link-add">＋ Dodaj link</button>${ls.length ? '' : '<span class="small muted">Dysk Google, materiały od klienta, Canva, brief…</span>'}` : ''}</div>`;
+// szybki dostęp pod nazwą klienta; edycja w zakładce „Profil, filary i ustawienia”
+function linksBar(c) {
+  const ls = linksOf(c).filter(l => l.url.trim());
+  const edit = `#/k/${c.id}/profil`;
+  return `<div class="links-bar"><span class="lb-l">${ICON.link} Linki</span>${ls.map(l => `<span class="lnk"><a href="${esc(safeUrl(l.url.trim()))}" target="_blank" rel="noopener" title="${esc(l.url)}">${esc(l.name || linkName(safeUrl(l.url.trim())))}</a></span>`).join('')}
+    <a class="lnk-add" href="${edit}" data-go-links>${ls.length ? '✎ Edytuj' : '＋ Dodaj linki do materiałów'}</a></div>`;
 }
-function linkModal(c, i) {
-  const l = i >= 0 ? linksOf(c)[i] : { name: '', url: '', shared: false };
-  modal(`<div class="modal-h"><h2 style="font-size:18px">${i >= 0 ? 'Edytuj link' : 'Dodaj link'}</h2></div>
-    <div class="modal-b">
-      <div class="field"><label>Adres</label><input class="input" id="lkUrl" value="${esc(l.url)}" placeholder="https://drive.google.com/…"></div>
-      <div class="field"><label>Nazwa <span class="hint">· np. Zdjęcia od klienta, Logo i księga znaku</span></label><input class="input" id="lkName" value="${esc(l.name)}" placeholder="pusta = adres strony"></div>
-      <label class="st-check"><input type="checkbox" id="lkShared" ${l.shared ? 'checked' : ''}> Pokaż klientowi w jego panelu</label>
-    </div>
-    <div class="modal-f">${i >= 0 ? `<button class="btn bad" data-act="link-del" data-i="${i}">Usuń</button><span class="grow"></span>` : ''}<button class="btn" data-act="close-modal">Anuluj</button><button class="btn primary" data-act="link-save" data-i="${i}">Zapisz</button></div>`);
-  $('#lkUrl').focus();
+function linksCard(c) {
+  const rows = linksOf(c).map((l, i) => `<div class="lk-row">
+      <input class="input" data-lfield="${i}.name" value="${esc(l.name)}" placeholder="Nazwa, np. Zdjęcia od klienta">
+      <input class="input" data-lfield="${i}.url" value="${esc(l.url)}" placeholder="https://drive.google.com/…">
+      ${l.url.trim() ? `<a class="btn sm ghost" href="${esc(safeUrl(l.url.trim()))}" target="_blank" rel="noopener" title="Otwórz">↗</a>` : '<span class="lk-sp"></span>'}
+      <button class="btn sm ghost" data-act="link-del" data-i="${i}" title="Usuń link">✕</button></div>`).join('');
+  return `<div class="card" id="links-card" style="grid-column:1/-1"><div class="card-h"><h3>Linki do materiałów</h3><span class="small muted">· tylko dla zespołu agencji, widać je pod nazwą klienta</span><span class="grow"></span><button class="btn sm" data-act="link-add">＋ Dodaj link</button></div>
+    <div class="card-b">${rows || '<div class="small muted">Dysk Google, materiały od klienta, Canva, brief, księga znaku… Dodaj link, a będzie pod ręką na każdej zakładce klienta.</div>'}</div></div>`;
 }
 document.addEventListener('click', e => {
-  const el = e.target.closest('[data-act^="link-"]'); if (!el || PORTAL_TOKEN) return;
+  const el = e.target.closest('[data-act="link-add"], [data-act="link-del"]'); if (!el || PORTAL_TOKEN) return;
   const c = clientById(route().id); if (!c) return;
-  const a = el.dataset.act, i = +(el.dataset.i ?? -1);
-  if (a === 'link-add') return linkModal(c, -1);
-  if (a === 'link-edit') return linkModal(c, i);
-  const ls = linksOf(c).slice();
-  if (a === 'link-del') { if (!confirm(`Usunąć link „${ls[i].name || ls[i].url}”?`)) return; ls.splice(i, 1); }
-  if (a === 'link-save') {
-    const url = $('#lkUrl').value.trim();
-    if (!/^(https?:\/\/)?[\w-]+(\.[\w-]+)+/i.test(url)) { toast('Wklej pełny adres, np. https://drive.google.com/…'); return; }
-    const l = { name: $('#lkName').value.trim(), url: safeUrl(url), shared: $('#lkShared').checked };
-    if (i >= 0) ls[i] = l; else ls.push(l);
+  const ls = linksOf(c).map(l => ({ ...l }));
+  if (el.dataset.act === 'link-add') ls.push({ name: '', url: '' });
+  else {
+    const l = ls[+el.dataset.i];
+    if ((l.name || l.url) && !confirm(`Usunąć link „${l.name || l.url}”?`)) return;
+    ls.splice(+el.dataset.i, 1);
   }
-  c.links = ls; c.drive = '';
-  save(); closeModal(); render();
+  c.links = ls; c.drive = ''; save(); render();
+  if (el.dataset.act === 'link-add') $$('[data-lfield$=".name"]').pop()?.focus();
 });
+document.addEventListener('input', e => {
+  const t = e.target; if (!t.dataset.lfield) return;
+  const c = clientById(route().id); if (!c) return;
+  const [i, k] = t.dataset.lfield.split('.');
+  c.links = linksOf(c).map(l => ({ ...l })); c.drive = '';
+  c.links[+i][k] = t.value; save();
+});
+// po zmianie adresu odświeżamy przycisk „otwórz” i pasek linków
+document.addEventListener('change', e => { if (e.target.dataset.lfield) rerenderKeepFocus(e.target, `[data-lfield="${e.target.dataset.lfield}"]`); });
 
 /* ================= client views ================= */
 function viewClient(c, tab) {
@@ -396,7 +401,7 @@ function viewClient(c, tab) {
       <button class="btn" data-act="share" data-id="${c.id}">🔗 Link dla klienta</button>
       ${aiUi(`data-ai="plan-open" data-client="${c.id}"`, 'Zaplanuj z AI')}
       <button class="btn primary" data-act="new-post" data-client="${c.id}">＋ Nowa treść</button></div>
-    ${linksBar(c, true)}
+    ${linksBar(c)}
     <div class="tabs">${tabs.map(([k, l]) => `<a href="#/k/${c.id}/${k}" class="${tab === k ? 'active' : ''}">${l}</a>`).join('')}</div>
     ${content}
   </div>`;
@@ -596,6 +601,9 @@ function viewProfile(c) {
         <label class="row small muted" style="gap:6px">Kolor <input type="color" data-cfield="color" value="${esc(c.color)}" style="width:34px;height:26px;border:0;padding:0;background:none"></label></div></div>
       ${f('name', 'Nazwa klienta')}
       ${f('contact', 'Osoba kontaktowa / akceptująca', 'np. Anna Nowak – marketing')}
+      <div class="field"><label>Moduł Grafiki <span class="hint">· projekty w systemie identyfikacji marki, tylko dla zespołu</span></label>
+        <select class="select" data-cfield="brand"><option value="none" ${!clientBrand(c) ? 'selected' : ''}>Wyłączony</option>${brandList().map(b =>
+          `<option value="${esc(b.id)}" ${clientBrand(c) === b.id ? 'selected' : ''}>System identyfikacji ${esc(b.nazwa)}</option>`).join('')}</select></div>
       ${f('notes', 'Notatki wewnętrzne', 'Wytyczne, zakazy, ustalenia…', 'textarea')}
     </div></div>
     <div class="card"><div class="card-h"><h3>Profile w social media</h3></div><div class="card-b">
@@ -605,6 +613,7 @@ function viewProfile(c) {
       <div class="two">${f('liName', 'Nazwa strony / profilu')}${f('liFollowers', 'Obserwujący (do podglądu)', 'np. 4 812')}</div>
       ${f('freq', 'Zasady i częstotliwość publikacji', 'np. dni robocze, 4 posty tygodniowo FB + IG', 'textarea')}
     </div></div>
+    ${linksCard(c)}
     <div class="card" style="grid-column:1/-1"><div class="card-h"><h3>Strategia</h3><span class="grow"></span>${aiUi('data-ai="strategy-pdf"', 'Wczytaj strategię z PDF', 'btn sm')}</div><div class="card-b">
       <div class="two">${f('tone', 'Ton komunikacji', 'np. bez długich myślników i list, emoji z umiarem', 'textarea')}<div>${f('audience', 'Grupa docelowa')}${f('hashtags', 'Stałe hashtagi', '#marka #branża')}</div></div>
       ${f('strategy', 'Jak filary współgrają', 'np. Filar 1 przyciąga uwagę, Filar 2 pokazuje ofertę, Filar 3 domyka decyzję zaufaniem', 'textarea')}
@@ -1044,7 +1053,6 @@ function viewPortal(token) {
   return `<div class="portal-top"><div class="in">${avatar(c, 36)}<div><div style="font-weight:650">${esc(c.name)}</div><div class="small muted">Plan treści do akceptacji</div></div>
     <span class="grow"></span><label class="small muted row">Twoje imię <input class="input" style="width:170px" data-act-input="reviewer" value="${esc(reviewer)}" placeholder="np. Anna Nowak"></label></div></div>
   <div class="portal">
-    ${linksBar(c, false)}
     <div class="notice">Sprawdź zaplanowane treści. Przy każdej możesz kliknąć <b>Akceptuję</b> albo <b>Poproś o zmiany</b> i dopisać uwagi. Agencja zobaczy je od razu.</div>
     <div class="toolbar">
       <div class="monthnav"><button class="btn icon" data-act="month" data-d="-1">‹</button><div class="label">${monthLabel(ui.month)}</div><button class="btn icon" data-act="month" data-d="1">›</button></div>
@@ -1811,7 +1819,7 @@ document.addEventListener('input', e => {
     return;
   }
   if (t.dataset.cfield) { const c = clientById(route().id); c[t.dataset.cfield] = t.value; save();
-    if (t.dataset.cfield === 'color' || t.dataset.cfield === 'name') rerenderKeepFocus(t, `[data-cfield="${t.dataset.cfield}"]`);
+    if (['color', 'name', 'brand'].includes(t.dataset.cfield)) rerenderKeepFocus(t, `[data-cfield="${t.dataset.cfield}"]`);
     return; }
   if (t.dataset.pfield) { const c = clientById(route().id); const [i, k] = t.dataset.pfield.split('.'); const pl = c.pillars[+i];
     if (k === 'name') { const old = pl.name; state.posts.forEach(p => { if (p.clientId === c.id && p.pillar === old) p.pillar = t.value; }); }

@@ -38,7 +38,7 @@ def login(c: TestClient, email="admin@agencja.pl", password="tajne-haslo-1"):
 def seed(c: TestClient):
     body = {
         "clients": [{"id": "klient01", "token": TOKEN, "name": "Kawiarnia", "notes": "TAJNE notatki agencji",
-                     "contact": "Anna", "links": [{"name": "Zdjęcia", "url": "https://drive.google.com/x", "shared": True}, {"name": "TAJNE wyceny", "url": "https://example.com/wyceny", "shared": False}], "pillars": [{"id": "p1", "name": "Produkt", "color": "#000", "goal": "sprzedaż"}]}],
+                     "contact": "Anna", "links": [{"name": "TAJNE wyceny", "url": "https://example.com/wyceny"}], "pillars": [{"id": "p1", "name": "Produkt", "color": "#000", "goal": "sprzedaż"}]}],
         "months": [{"clientId": "klient01", "month": "2026-10", "weeks": {"2026-10-05": "Tydzień kawy"}, "notes": "Uwagi do planu"}],
         "posts": [
             {"id": "post0001", "clientId": "klient01", "date": "2026-10-06", "title": "Gotowy post", "approval": "pending",
@@ -99,7 +99,7 @@ def test_portal_hides_internal_data(client):
     assert "note" not in data["posts"][0]
     c = data["clients"][0]
     assert c["name"] == "Kawiarnia" and "notes" not in c and "contact" not in c
-    assert c["links"] == [{"name": "Zdjęcia", "url": "https://drive.google.com/x"}]  # tylko linki udostępnione klientowi
+    assert "links" not in c and "brand" not in c  # linki do materiałów i ustawienia Grafik są tylko dla agencji
     assert data["months"][0]["notes"] == "Uwagi do planu"
     assert "TAJNE" not in anon.get(f"/api/p/{TOKEN}").text
     assert anon.get("/api/p/" + "b" * 24).status_code == 404
