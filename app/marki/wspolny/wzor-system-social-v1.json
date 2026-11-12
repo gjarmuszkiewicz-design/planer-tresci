@@ -1,0 +1,44 @@
+{
+  "typ": "system-social",
+  "wersja": 1,
+  "marka": {
+    "nazwa": "Kawiarnia Ziarno",
+    "konto": "@ziarno.kawa",
+    "www": "ziarno.pl"
+  },
+  "kolory": {
+    "ciemny": "#141414",
+    "jasny": "#FFFFFF",
+    "akcent": "#E6CC9C",
+    "tlo": "#F5EFE6",
+    "akcentTekst": "#141414"
+  },
+  "fonty": {
+    "tytul": {
+      "rodzina": "Playfair Display",
+      "waga": 700,
+      "wersaliki": false
+    },
+    "tekst": {
+      "rodzina": "Montserrat",
+      "waga": 400
+    },
+    "google": "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Montserrat:wght@400;500;600;700&display=block"
+  },
+  "logo": {
+    "naCiemnym": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MjAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0MCIgZmlsbD0iI0U2Q0M5QyIvPjx0ZXh0IHg9IjUwIiB5PSI2NCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9Ikdlb3JnaWEsc2VyaWYiIGZvbnQtc2l6ZT0iNDQiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiNGRkZGRkYiPlo8L3RleHQ+PHRleHQgeD0iMTEwIiB5PSI2NiIgZm9udC1mYW1pbHk9Ikdlb3JnaWEsc2VyaWYiIGZvbnQtc2l6ZT0iNTIiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiNGRkZGRkYiPlppYXJubzwvdGV4dD48L3N2Zz4=",
+    "naJasnym": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MjAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0MCIgZmlsbD0iI0U2Q0M5QyIvPjx0ZXh0IHg9IjUwIiB5PSI2NCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9Ikdlb3JnaWEsc2VyaWYiIGZvbnQtc2l6ZT0iNDQiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiMxNDE0MTQiPlo8L3RleHQ+PHRleHQgeD0iMTEwIiB5PSI2NiIgZm9udC1mYW1pbHk9Ikdlb3JnaWEsc2VyaWYiIGZvbnQtc2l6ZT0iNTIiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiMxNDE0MTQiPlppYXJubzwvdGV4dD48L3N2Zz4=",
+    "znak": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0OCIgZmlsbD0iI0U2Q0M5QyIvPjx0ZXh0IHg9IjUwIiB5PSI2NiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9Ikdlb3JnaWEsc2VyaWYiIGZvbnQtc2l6ZT0iNTAiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiMxNDE0MTQiPlo8L3RleHQ+PC9zdmc+"
+  },
+  "styl": {
+    "zaokraglenie": 0,
+    "etykieta": "tekst",
+    "linia": true,
+    "cien": 0.78
+  },
+  "teksty": {
+    "stopka": "@ziarno.kawa",
+    "cta": "Zarezerwuj stolik"
+  },
+  "zdjecia": []
+}

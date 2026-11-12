@@ -57,18 +57,40 @@ Każdy klient poza WIZme dostaje grafiki z jednego, wspólnego układu pliku. Pl
 wizualnej na social media i niesie tylko wygląd marki; szablony (okładka na zdjęciu, slajd z treścią, cytat, liczba,
 zdjęcie z podpisem, zaproszenie, logo, awatar, okładka wyróżnionej, grafika pozioma, banery), formaty i strefy bezpieczne
 są wspólne (`app/marki/wspolny/system.js`). Wgrywa się go w profilu klienta: **Moduł Grafiki → Własny system klienta z pliku**.
-Wzór do pobrania jest tam pod przyciskiem „Wzór pliku” (`app/marki/wspolny/wzor-system-social.json`).
+Wzór do pobrania jest tam pod przyciskiem „Wzór pliku” (`app/marki/wspolny/wzor-system-social.json`, wersja 2;
+wzór wersji 1: `wzor-system-social-v1.json`). Aplikacja czyta wersje 1 i 2.
 
 | Pole | Wymagane | Opis |
 |---|---|---|
-| `typ`, `wersja` | tak | zawsze `"system-social"` i `1` |
+| `typ`, `wersja` | tak | zawsze `"system-social"`, wersja `1` albo `2` |
 | `marka.nazwa` | tak | nazwa marki; `marka.konto` (np. `@konto`) i `marka.www` opcjonalnie |
 | `kolory.ciemny`, `.jasny`, `.akcent`, `.tlo` | tak | `#RRGGBB`: tło ciemne, tekst na ciemnym, akcent (etykiety, wyróżnione słowa, linie, przycisk), jasne tło slajdów z treścią; `kolory.akcentTekst` – tekst na tle akcentu (domyślnie ciemny) |
 | `fonty.tytul`, `fonty.tekst` | tak | `{"rodzina": "Playfair Display", "waga": 700, "wersaliki": false}`; `fonty.google` – adres CSS z fonts.googleapis.com z tymi krojami |
 | `logo.naCiemnym`, `.naJasnym`, `.znak` | nie | obraz jako `data:image/svg+xml;base64,…` (także PNG, JPG, WEBP) albo adres `https://`; znak = sygnet do awatara. Bez logo stopka pokazuje nazwę marki |
 | `styl` | nie | `zaokraglenie` (px), `etykieta` (`"tekst"` albo `"pigulka"`), `linia` (linia pod tytułem), `cien` (siła przyciemnienia zdjęcia 0–1) |
 | `teksty.stopka`, `teksty.cta` | nie | tekst w stopce (domyślnie konto) i domyślny napis na przycisku |
-| `zdjecia` | nie | lista adresów zdjęć marki do wyboru w edytorze |
+| `zdjecia` | nie | lista adresów zdjęć marki do wyboru w edytorze (w v2 także obiekty `{"plik": adres, "opis": …}`) |
+
+**Wersja 2** jest nadzbiorem wersji 1: wszystkie pola v1 znaczą to samo, a nowe są opcjonalne. Bez nich grafika wygląda
+jak w v1. Kolory w nowych polach: `#RGB`, `#RRGGBB` albo `#RRGGBBAA`. CSS aplikacja buduje sama ze struktury pliku –
+surowego CSS z pliku nie przyjmuje.
+
+| Pole (v2) | Opis |
+|---|---|
+| `kolory.tekstNaJasnym` | tekst na jasnym tle (domyślnie `ciemny`) |
+| `kolory.akcentNaJasnym` | etykiety, wyróżnione słowa, liczba, linia, cudzysłów i przycisk na jasnym tle (domyślnie `akcent`); `kolory.etykietaNaJasnym` – osobny kolor samych etykiet |
+| `kolory.paleta` | `[{"nazwa", "hex", "rola"}]` – pełna paleta, widoczna w profilu klienta (do 24) |
+| `zlozone.tloCiemne`, `.tloJasne`, `.tloAkcent` | gradient tła: `{"typ": "linear", "kat": 180, "stopy": [["#hex", 0], ["#hex", 100]]}` albo `{"typ": "radial", "ksztalt": "ellipse 80% 60% at 50% 42%", "stopy": …}`; 2–8 stóp, pozycje 0–100 %, kształt tylko `ellipse`/`circle` z procentami i `at X% Y%`. Pod gradientem zostaje kolor płaski |
+| `zlozone.cien` | cień pod napisem na zdjęciu w kolorze marki: `{"kolor": "#140907", "stopy": [[krycie 0–1, pozycja %], …]}`; pole „Przyciemnienie” w edytorze skaluje krycie (100 = jak w systemie) |
+| `fonty.tytul.interlinia`, `.odstep` | interlinia (0,7–2,5) i odstęp liter w em (−0,05–0,5) tytułu |
+| `fonty.tekst.waga`, `.interlinia` | grubość (100–900) i interlinia tekstu |
+| `fonty.etykieta` | `{"rodzina", "waga", "wersaliki", "odstep", "rozmiar"}` etykiety i numeru slajdu |
+| `fonty.akcent` | jak wyróżniać `*słowa*` w tytule: `"kolor"` (jak v1), `"kursywa"` albo `"pogrubienie"` |
+| `marginesy.post`, `.story`, `.kwadrat` | strefy w px (0–600): `{"gora", "dol", "bok"}` |
+| `styl.cienNaTytule` | `false` wyłącza cień pod tytułem na zdjęciu |
+| `tla.dozwolone` | tła do wyboru w edytorze, podzbiór `["ciemne", "jasne", "akcent"]`; przy jednym tle pole „Tło” znika |
+
+Pozostałe pola z paczki v2 (warianty logo, obrazy teł, kadr zdjęć, język, publikacje) aplikacja na razie pomija.
 
 Aplikacja sprawdza plik przy wgrywaniu i pokazuje, czego brakuje. Duże logo rastrowe zapisuje w grafikach aplikacji.
 Plik klienta nie trafia do panelu klienta.

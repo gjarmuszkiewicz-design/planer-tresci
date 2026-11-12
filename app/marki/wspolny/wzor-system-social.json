@@ -1,6 +1,6 @@
 {
   "typ": "system-social",
-  "wersja": 1,
+  "wersja": 2,
   "marka": {
     "nazwa": "Kawiarnia Ziarno",
     "konto": "@ziarno.kawa",
@@ -11,19 +11,119 @@
     "jasny": "#FFFFFF",
     "akcent": "#E6CC9C",
     "tlo": "#F5EFE6",
-    "akcentTekst": "#141414"
+    "akcentTekst": "#141414",
+    "tekstNaJasnym": "#141414",
+    "akcentNaJasnym": "#E6CC9C",
+    "paleta": [
+      {
+        "nazwa": "Ciemny",
+        "hex": "#141414",
+        "rola": "tło ciemne, tekst na jasnym"
+      },
+      {
+        "nazwa": "Jasny",
+        "hex": "#FFFFFF",
+        "rola": "tekst na ciemnym i na zdjęciu"
+      },
+      {
+        "nazwa": "Akcent",
+        "hex": "#E6CC9C",
+        "rola": "etykiety, wyróżnienia, przycisk"
+      },
+      {
+        "nazwa": "Tło",
+        "hex": "#F5EFE6",
+        "rola": "jasne tło slajdów"
+      }
+    ]
+  },
+  "zlozone": {
+    "tloCiemne": {
+      "typ": "radial",
+      "ksztalt": "ellipse 80% 60% at 50% 40%",
+      "stopy": [
+        [
+          "#141414",
+          0
+        ],
+        [
+          "#141414E6",
+          60
+        ],
+        [
+          "#000000",
+          100
+        ]
+      ]
+    },
+    "tloJasne": {
+      "typ": "linear",
+      "kat": 180,
+      "stopy": [
+        [
+          "#F5EFE6",
+          0
+        ],
+        [
+          "#F5EFE6",
+          100
+        ]
+      ]
+    },
+    "cien": {
+      "kolor": "#141414",
+      "stopy": [
+        [
+          0.3,
+          0
+        ],
+        [
+          0,
+          18
+        ],
+        [
+          0,
+          42
+        ],
+        [
+          0.6,
+          70
+        ],
+        [
+          0.9,
+          100
+        ]
+      ]
+    }
+  },
+  "tla": {
+    "dozwolone": [
+      "ciemne",
+      "jasne",
+      "akcent"
+    ]
   },
   "fonty": {
     "tytul": {
       "rodzina": "Playfair Display",
       "waga": 700,
-      "wersaliki": false
+      "wersaliki": false,
+      "interlinia": 1.06,
+      "odstep": -0.01
     },
     "tekst": {
       "rodzina": "Montserrat",
-      "waga": 400
+      "waga": 400,
+      "interlinia": 1.45
     },
-    "google": "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Montserrat:wght@400;500;600;700&display=block"
+    "google": "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Montserrat:wght@400;500;600;700&display=block",
+    "etykieta": {
+      "waga": 500,
+      "wersaliki": true,
+      "odstep": 0.2,
+      "rozmiar": 24
+    },
+    "akcent": "kolor"
   },
   "logo": {
     "naCiemnym": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MjAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0MCIgZmlsbD0iI0U2Q0M5QyIvPjx0ZXh0IHg9IjUwIiB5PSI2NCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9Ikdlb3JnaWEsc2VyaWYiIGZvbnQtc2l6ZT0iNDQiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiNGRkZGRkYiPlo8L3RleHQ+PHRleHQgeD0iMTEwIiB5PSI2NiIgZm9udC1mYW1pbHk9Ikdlb3JnaWEsc2VyaWYiIGZvbnQtc2l6ZT0iNTIiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiNGRkZGRkYiPlppYXJubzwvdGV4dD48L3N2Zz4=",
@@ -34,7 +134,25 @@
     "zaokraglenie": 0,
     "etykieta": "tekst",
     "linia": true,
-    "cien": 0.78
+    "cien": 0.78,
+    "cienNaTytule": true
+  },
+  "marginesy": {
+    "post": {
+      "gora": 100,
+      "dol": 96,
+      "bok": 90
+    },
+    "story": {
+      "gora": 250,
+      "dol": 380,
+      "bok": 90
+    },
+    "kwadrat": {
+      "gora": 90,
+      "dol": 90,
+      "bok": 90
+    }
   },
   "teksty": {
     "stopka": "@ziarno.kawa",

@@ -199,7 +199,8 @@ def test_client_brand_system_file(client):
     assert anon.get("/marki/wspolny/wzor-system-social.json").status_code == 401
     assert anon.get("/marki/wspolny/system.js").status_code == 401
     wzor = client.get("/marki/wspolny/wzor-system-social.json").json()
-    assert wzor["typ"] == "system-social" and wzor["wersja"] == 1
+    assert wzor["typ"] == "system-social" and wzor["wersja"] == 2
+    assert client.get("/marki/wspolny/wzor-system-social-v1.json").json()["wersja"] == 1
     assert {"ciemny", "jasny", "akcent", "tlo"} <= set(wzor["kolory"]) and wzor["fonty"]["tytul"]["rodzina"]
     assert "systemZPliku" in client.get("/marki/wspolny/system.js").text
     client.post("/api/sync", json={"clients": [{"id": "klient01", "token": TOKEN, "name": "Kawiarnia", "brand": "plik",
@@ -207,6 +208,40 @@ def test_client_brand_system_file(client):
     assert "TAJNY" not in TestClient(app).get(f"/api/p/{TOKEN}").text
     # projekty z własnego systemu klienta mają markę k-<id klienta>
     assert client.put("/api/designs/proj0003", json={"brand": "k-klient01", "data": {"format": "post", "typ": "okladka"}}).status_code == 200
+
+
+VALIDATOR_JS = r"""
+const fs = require('fs'); global.window = {};
+eval(fs.readFileSync('app/marki/wspolny/system.js', 'utf8'));
+const base = f => JSON.parse(fs.readFileSync('app/marki/wspolny/' + f, 'utf8'));
+const ok = o => !window.sprawdzSystem(o).blad;
+const v2 = base('wzor-system-social.json'), zmien = f => { const o = JSON.parse(JSON.stringify(v2)); f(o); return o; };
+const brand = window.systemZPliku({ ...window.sprawdzSystem(zmien(o => { o.tla.dozwolone = ['ciemne', 'jasne']; })).system, wczytano: 1 }, 'k-x');
+console.log(JSON.stringify({
+  v1: ok(base('wzor-system-social-v1.json')), v2: ok(v2), v3: ok(zmien(o => { o.wersja = 3; })),
+  zlaStopa: ok(zmien(o => { o.zlozone.tloCiemne.stopy[0][0] = 'red'; })),
+  ksztaltSrednik: ok(zmien(o => { o.zlozone.tloCiemne.ksztalt = 'ellipse 50%; color:red'; })),
+  ksztaltUrl: ok(zmien(o => { o.zlozone.tloCiemne.ksztalt = 'url(https://x/a.png)'; })),
+  akcent: ok(zmien(o => { o.fonty.akcent = 'migotanie'; })),
+  tla: brand.pola.tlo.opcje.map(x => x[0]),
+  css: /radial-gradient\(ellipse 80% 60% at 50% 40%/.test(brand.css),
+}));
+"""
+
+
+def test_system_file_validator_v1_v2():
+    import json
+    import shutil
+    import subprocess
+    from pathlib import Path
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("brak Node.js")
+    root = Path(__file__).resolve().parents[1]
+    out = json.loads(subprocess.run([node, "-e", VALIDATOR_JS], cwd=root, capture_output=True, text=True, check=True).stdout)
+    assert out == {"v1": True, "v2": True, "v3": False, "zlaStopa": False, "ksztaltSrednik": False, "ksztaltUrl": False,
+                   "akcent": False, "tla": ["ciemne", "jasne"], "css": True}
 
 
 def test_ai_assistant(client, monkeypatch):

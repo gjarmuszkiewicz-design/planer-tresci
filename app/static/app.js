@@ -407,10 +407,23 @@ function brandField(c) {
       <option value="plik" ${v === 'plik' ? 'selected' : ''}>Własny system klienta z pliku</option></select>
     ${v === 'plik' ? `<div class="sys-box">${s
       ? `<div><b>✓ ${esc(s.marka.nazwa)}</b> <span class="small muted">· plik ${esc(s.plik || '')}, wczytany ${fmtTs(s.wczytano)}</span></div>
-         <div class="sys-kol">${['ciemny', 'jasny', 'akcent', 'tlo'].map(k => `<i style="background:${esc(s.kolory[k])}" title="${k} ${esc(s.kolory[k])}"></i>`).join('')}<span class="small muted">${esc(s.fonty.tytul.rodzina)} · ${esc(s.fonty.tekst.rodzina)}</span></div>`
+         <div class="sys-kol">${['ciemny', 'jasny', 'akcent', 'tlo'].map(k => `<i style="background:${esc(s.kolory[k])}" title="${k} ${esc(s.kolory[k])}"></i>`).join('')}<span class="small muted">${esc(s.fonty.tytul.rodzina)} · ${esc(s.fonty.tekst.rodzina)}${s.fonty.akcent ? ` · akcent: ${esc(s.fonty.akcent)}` : ''} · wersja ${s.wersja || 1}</span></div>
+         ${sysV2Preview(s)}`
       : '<div class="small muted">Wgraj plik systemu identyfikacji wygenerowany pod social media (system-social.json). Wszyscy klienci mają ten sam układ pliku.</div>'}
       <div class="row wrap" style="gap:6px;margin-top:8px"><button class="btn sm" data-act="sys-upload">⤒ ${s ? 'Wgraj nowy plik' : 'Wgraj plik systemu'}</button>
         ${s ? '<button class="btn sm ghost" data-act="sys-download">⤓ Pobierz obecny</button>' : ''}<a class="btn sm ghost" href="/marki/wspolny/wzor-system-social.json" download="wzor-system-social.json">Wzór pliku</a></div></div>` : ''}</div>`;
+}
+// v2: pełna paleta z nazwami i paski gradientów (CSS gradientu buduje system.js ze sprawdzonej struktury)
+function sysV2Preview(s) {
+  const pal = s.kolory.paleta || [], z = s.zlozone || {};
+  const gr = Object.entries({ tloCiemne: 'Tło ciemne', tloJasne: 'Tło jasne', tloAkcent: 'Tło akcentu' }).filter(([k]) => z[k]);
+  if (!pal.length && !gr.length && !z.cien && !s.tla) return '';
+  if ((gr.length || z.cien) && !window.gradientSystemu && !sysV2Preview.loading) sysV2Preview.loading = loadScript('/marki/wspolny/system.js').then(render);
+  const g = x => window.gradientSystemu ? esc(window.gradientSystemu(x)) : '#ddd';
+  return `${pal.length ? `<div class="sys-pal">${pal.map(c => `<span title="${esc(c.rola)}"><i style="background:${esc(c.hex)}"></i>${esc(c.nazwa || c.hex)}<em>${esc(c.hex)}</em></span>`).join('')}</div>` : ''}
+    ${gr.length || z.cien ? `<div class="sys-gr">${gr.map(([k, n]) => `<div><i style="background:${g(z[k])}"></i><span>${n}</span></div>`).join('')}${z.cien
+      ? `<div><i style="background:linear-gradient(180deg,${z.cien.stopy.map(([a, p]) => `color-mix(in srgb, ${esc(z.cien.kolor)} ${Math.round(a * 100)}%, transparent) ${p}%`).join(',')}),repeating-conic-gradient(#ddd 0 25%,#fff 0 50%) 0 0/12px 12px"></i><span>Cień na zdjęciu</span></div>` : ''}</div>` : ''}
+    ${s.tla?.dozwolone ? `<div class="small muted" style="margin-top:6px">Dozwolone tła: ${s.tla.dozwolone.join(', ')}</div>` : ''}`;
 }
 // wgranie pliku systemu: sprawdzenie układu, duże logo rastrowe trafia do /media, żeby stan klienta był lekki
 async function uploadSystem(c) {

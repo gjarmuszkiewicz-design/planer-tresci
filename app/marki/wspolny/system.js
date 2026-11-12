@@ -3,7 +3,7 @@
    a szablony, formaty i strefy bezpieczne są wspólne i żyją tutaj. Opis pliku: README → „Plik systemu identyfikacji”.
    Interfejs obiektu marki jest taki sam jak w app/marki/wizme/marka.js, więc moduł Grafiki obsługuje oba. */
 (() => {
-  const TYP = 'system-social', WERSJA = 1;
+  const TYP = 'system-social', WERSJE = [1, 2];
   const tekstHtml = (s = '') => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const cssUrl = (s = '') => String(s).replace(/['"\\()\s]/g, '');
   const nbsp = (s = '') => s.replace(/(^|\s)([aiouwzAIOUWZ])\s/g, '$1$2\u00a0');
@@ -15,6 +15,21 @@
   const liczba = (v, d) => (v === '' || v == null || isNaN(+v) ? d : +v);
   const HEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
   const OBRAZ = /^(data:image\/(png|jpeg|webp|svg\+xml)[;,]|https:\/\/|\/media\/)/i;
+  // v2: kolory także z kanałem alfa; kształt gradientu radialnego tylko z bezpiecznych słów i procentów
+  const HEX2 = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+  const KSZTALT = /^(ellipse|circle)( \d{1,3}%){0,2}( at \d{1,3}% \d{1,3}%)?$/;
+  const TLA = ['ciemne', 'jasne', 'akcent'];
+  const AKCENTY = ['kursywa', 'kolor', 'pogrubienie'];
+  // CSS gradientu budujemy wyłącznie ze sprawdzonej struktury – nigdy nie wklejamy CSS z pliku
+  const gradientCss = g => {
+    const stopy = g.stopy.map(([c, p]) => `${c} ${p}%`).join(', ');
+    return g.typ === 'radial' ? `radial-gradient(${g.ksztalt || 'ellipse'}, ${stopy})` : `linear-gradient(${g.kat}deg, ${stopy})`;
+  };
+  const rgba = (hex, a) => {
+    let h = hex.slice(1); if (h.length <= 4) h = [...h].map(x => x + x).join('');
+    const n = i => parseInt(h.slice(i, i + 2), 16);
+    return `rgba(${n(0)},${n(2)},${n(4)},${(+a).toFixed(3)})`;
+  };
 
   /* ---------- sprawdzenie pliku ---------- */
   // Zwraca { system } albo { blad } z opisem po polsku. Nieznane pola są pomijane.
@@ -22,7 +37,9 @@
     const blad = b => ({ blad: b });
     if (!s || typeof s !== 'object') return blad('Plik nie jest obiektem JSON.');
     if (s.typ !== TYP) return blad(`To nie jest plik systemu identyfikacji (pole „typ” musi mieć wartość „${TYP}”).`);
-    if (+s.wersja !== WERSJA) return blad(`Nieobsługiwana wersja pliku: ${s.wersja}. Aplikacja czyta wersję ${WERSJA}.`);
+    if (!WERSJE.includes(+s.wersja)) return blad(`Nieobsługiwana wersja pliku: ${s.wersja}. Aplikacja czyta wersje ${WERSJE.join(' i ')}.`);
+    let v2;
+    try { v2 = +s.wersja === 2 ? polaV2(s) : {}; } catch (e) { return blad(e.message); }
     const m = s.marka || {}, k = s.kolory || {}, f = s.fonty || {}, l = s.logo || {}, st = s.styl || {}, t = s.teksty || {};
     if (!String(m.nazwa || '').trim()) return blad('Brakuje nazwy marki (marka.nazwa).');
     for (const p of ['ciemny', 'jasny', 'akcent', 'tlo']) if (!HEX.test(k[p] || '')) return blad(`Kolor „kolory.${p}” musi być w zapisie #RRGGBB.`);
@@ -30,23 +47,103 @@
     for (const p of ['tytul', 'tekst']) if (!String(f[p]?.rodzina || '').trim()) return blad(`Brakuje kroju „fonty.${p}.rodzina”.`);
     if (f.google && !/^https:\/\/fonts\.googleapis\.com\//.test(f.google)) return blad('„fonty.google” musi być adresem https://fonts.googleapis.com/…');
     for (const p of ['naCiemnym', 'naJasnym', 'znak']) if (l[p] && !OBRAZ.test(l[p])) return blad(`Logo „logo.${p}” musi być obrazem: data:image/… (SVG, PNG, JPG, WEBP) albo adresem https://.`);
-    const zdjecia = (Array.isArray(s.zdjecia) ? s.zdjecia : []).filter(u => typeof u === 'string' && OBRAZ.test(u)).slice(0, 60);
+    // v1: lista adresów; v2: obiekty { plik, opis } – po imporcie paczki plik jest już adresem /media/…
+    const zdjecia = (Array.isArray(s.zdjecia) ? s.zdjecia : []).map(u => (typeof u === 'string' ? u : u?.plik)).filter(u => typeof u === 'string' && OBRAZ.test(u)).slice(0, 60);
     const font = (x, waga) => ({ rodzina: String(x.rodzina).trim().slice(0, 80), waga: liczba(x.waga, waga), wersaliki: !!x.wersaliki });
     return { system: {
-      typ: TYP, wersja: WERSJA,
+      typ: TYP, wersja: +s.wersja,
       marka: { nazwa: String(m.nazwa).trim().slice(0, 80), konto: String(m.konto || '').slice(0, 60), www: String(m.www || '').slice(0, 80) },
-      kolory: { ciemny: k.ciemny, jasny: k.jasny, akcent: k.akcent, tlo: k.tlo, akcentTekst: k.akcentTekst || k.ciemny },
-      fonty: { tytul: font(f.tytul, 700), tekst: font(f.tekst, 400), google: f.google || '' },
+      kolory: { ciemny: k.ciemny, jasny: k.jasny, akcent: k.akcent, tlo: k.tlo, akcentTekst: k.akcentTekst || k.ciemny, ...v2.kolory },
+      fonty: { tytul: { ...font(f.tytul, 700), ...v2.tytul }, tekst: { ...font(f.tekst, 400), ...v2.tekst }, google: f.google || '', ...v2.fonty },
       logo: { naCiemnym: l.naCiemnym || '', naJasnym: l.naJasnym || '', znak: l.znak || '' },
       styl: {
         zaokraglenie: Math.max(0, Math.min(60, liczba(st.zaokraglenie, 0))),
         etykieta: st.etykieta === 'pigulka' ? 'pigulka' : 'tekst',
         linia: st.linia !== false,
         cien: Math.max(0, Math.min(1, liczba(st.cien, 0.78))),
+        ...v2.styl,
       },
       teksty: { stopka: String(t.stopka || m.konto || '').slice(0, 60), cta: String(t.cta || 'Napisz do nas').slice(0, 40) },
       zdjecia,
+      ...v2.reszta,
     } };
+  }
+
+  // Nowe pola wersji 2 (wszystkie opcjonalne). Rzuca błąd z opisem po polsku; zwraca tylko sprawdzone wartości.
+  function polaV2(s) {
+    const zle = m => { throw new Error(m); };
+    const obj = v => (v && typeof v === 'object' && !Array.isArray(v) ? v : null);
+    const hex = (v, gdzie) => (HEX2.test(v || '') ? v : zle(`Kolor „${gdzie}” musi być w zapisie #RGB, #RRGGBB albo #RRGGBBAA.`));
+    const num = (v, min, max, gdzie) => (v === '' || v == null || isNaN(+v) || +v < min || +v > max ? zle(`„${gdzie}” musi być liczbą od ${min} do ${max}.`) : +v);
+    const opc = (o, kl, min, max, gdzie, wynik) => { if (o[kl] != null && o[kl] !== '') wynik[kl] = num(o[kl], min, max, `${gdzie}.${kl}`); };
+    const k = obj(s.kolory) || {}, f = obj(s.fonty) || {}, z = obj(s.zlozone), st = obj(s.styl) || {}, mg = obj(s.marginesy), tl = obj(s.tla);
+    const kolory = {}, tytul = {}, tekst = {}, fonty = {}, styl = {}, reszta = {};
+    // kolory
+    if (k.tekstNaJasnym) kolory.tekstNaJasnym = hex(k.tekstNaJasnym, 'kolory.tekstNaJasnym');
+    if (k.akcentNaJasnym) kolory.akcentNaJasnym = hex(k.akcentNaJasnym, 'kolory.akcentNaJasnym');
+    if (k.etykietaNaJasnym) kolory.etykietaNaJasnym = hex(k.etykietaNaJasnym, 'kolory.etykietaNaJasnym');
+    if (k.paleta != null) {
+      if (!Array.isArray(k.paleta)) zle('„kolory.paleta” musi być listą kolorów.');
+      kolory.paleta = k.paleta.slice(0, 24).map((c, i) => ({
+        nazwa: String(c?.nazwa || '').slice(0, 40), hex: hex(c?.hex, `kolory.paleta[${i + 1}].hex`), rola: String(c?.rola || '').slice(0, 120) }));
+    }
+    // gradienty i cień
+    const gradient = (g, gdzie) => {
+      if (!obj(g)) zle(`„${gdzie}” musi być obiektem gradientu.`);
+      if (!['linear', 'radial'].includes(g.typ)) zle(`„${gdzie}.typ” musi mieć wartość „linear” albo „radial”.`);
+      if (!Array.isArray(g.stopy) || g.stopy.length < 2 || g.stopy.length > 8) zle(`„${gdzie}.stopy” musi mieć od 2 do 8 punktów.`);
+      const stopy = g.stopy.map((x, i) => [hex(x?.[0], `${gdzie}.stopy[${i + 1}]`), num(x?.[1], 0, 100, `${gdzie}.stopy[${i + 1}] – pozycja`)]);
+      if (g.typ === 'radial') {
+        const ksztalt = String(g.ksztalt ?? 'ellipse').trim();
+        if (!KSZTALT.test(ksztalt)) zle(`„${gdzie}.ksztalt” ma niedozwoloną postać – np. „ellipse 80% 60% at 50% 42%”.`);
+        return { typ: 'radial', ksztalt, stopy };
+      }
+      return { typ: 'linear', kat: g.kat == null ? 180 : num(g.kat, 0, 360, `${gdzie}.kat`), stopy };
+    };
+    if (z) {
+      const zl = {};
+      for (const kl of ['tloCiemne', 'tloJasne', 'tloAkcent']) if (z[kl] != null) zl[kl] = gradient(z[kl], `zlozone.${kl}`);
+      if (z.cien != null) {
+        const c = obj(z.cien) || zle('„zlozone.cien” musi być obiektem.');
+        if (!Array.isArray(c.stopy) || c.stopy.length < 2 || c.stopy.length > 8) zle('„zlozone.cien.stopy” musi mieć od 2 do 8 punktów.');
+        zl.cien = { kolor: hex(c.kolor, 'zlozone.cien.kolor'),
+          stopy: c.stopy.map((x, i) => [num(x?.[0], 0, 1, `zlozone.cien.stopy[${i + 1}] – krycie`), num(x?.[1], 0, 100, `zlozone.cien.stopy[${i + 1}] – pozycja`)]) };
+      }
+      if (Object.keys(zl).length) reszta.zlozone = zl;
+    }
+    // typografia
+    const tt = obj(f.tytul) || {}, tx = obj(f.tekst) || {}, et = obj(f.etykieta);
+    opc(tt, 'interlinia', 0.7, 2.5, 'fonty.tytul', tytul); opc(tt, 'odstep', -0.05, 0.5, 'fonty.tytul', tytul);
+    if (tt.waga != null) tytul.waga = num(tt.waga, 100, 900, 'fonty.tytul.waga');
+    opc(tx, 'interlinia', 0.8, 3, 'fonty.tekst', tekst);
+    if (tx.waga != null) tekst.waga = num(tx.waga, 100, 900, 'fonty.tekst.waga');
+    if (et) {
+      const e = {};
+      if (et.rodzina) e.rodzina = String(et.rodzina).trim().slice(0, 80);
+      if (et.waga != null) e.waga = num(et.waga, 100, 900, 'fonty.etykieta.waga');
+      opc(et, 'odstep', -0.05, 0.5, 'fonty.etykieta', e); opc(et, 'rozmiar', 10, 80, 'fonty.etykieta', e);
+      if (et.wersaliki != null) e.wersaliki = !!et.wersaliki;
+      fonty.etykieta = e;
+    }
+    if (f.akcent != null) fonty.akcent = AKCENTY.includes(f.akcent) ? f.akcent : zle(`„fonty.akcent” musi mieć jedną z wartości: ${AKCENTY.join(', ')}.`);
+    // styl, marginesy, tła
+    if (st.cienNaTytule != null) styl.cienNaTytule = st.cienNaTytule !== false;
+    if (mg) {
+      const m = {};
+      for (const fm of ['post', 'story', 'kwadrat']) {
+        if (mg[fm] == null) continue;
+        const o = obj(mg[fm]) || zle(`„marginesy.${fm}” musi być obiektem { gora, dol, bok }.`), w = {};
+        for (const kl of ['gora', 'dol', 'bok']) opc(o, kl, 0, 600, `marginesy.${fm}`, w);
+        m[fm] = w;
+      }
+      reszta.marginesy = m;
+    }
+    if (tl && tl.dozwolone != null) {
+      const d = Array.isArray(tl.dozwolone) ? [...new Set(tl.dozwolone)] : [];
+      if (!d.length || d.some(x => !TLA.includes(x))) zle(`„tla.dozwolone” musi być niepustą listą z wartości: ${TLA.join(', ')}.`);
+      reszta.tla = { dozwolone: TLA.filter(x => d.includes(x)) };
+    }
+    return { kolory, tytul, tekst, fonty, styl, reszta };
   }
 
   /* ---------- wspólne formaty i szablony ---------- */
@@ -148,16 +245,52 @@ html,body{overflow:hidden;background:transparent}
   // Buduje obiekt marki z pliku klienta. id = 'k-<id klienta>', żeby projekty każdego klienta były osobno.
   window.systemZPliku = (sys, id) => {
     const k = sys.kolory, f = sys.fonty, st = sys.styl, L = sys.logo;
+    const Z = sys.zlozone || {}, M = sys.marginesy || {}, E = f.etykieta || {};
+    const tlo = (g, kolor) => (g ? `${gradientCss(g)}, ${kolor}` : kolor);
     const css = `:root{--ciemny:${k.ciemny};--jasny:${k.jasny};--akcent:${k.akcent};--tlo:${k.tlo};--akt:${k.akcentTekst || k.ciemny};
 --ft:"${fontNazwa(f.tytul.rodzina)}",Georgia,serif;--fx:"${fontNazwa(f.tekst.rodzina)}",Arial,sans-serif;
---tw:${f.tytul.waga};--tu:${f.tytul.wersaliki ? 'uppercase' : 'none'};--r:${st.zaokraglenie}px}` + CSS_WSPOLNY;
+--tw:${f.tytul.waga};--tu:${f.tytul.wersaliki ? 'uppercase' : 'none'};--r:${st.zaokraglenie}px}` + CSS_WSPOLNY + cssV2();
+    // wersja 2: wszystko poniżej dopisujemy tylko wtedy, gdy plik to określa – bez tych pól grafika wygląda jak w v1
+    function cssV2() {
+      let s = '';
+      if (Z.tloCiemne) s += `.ciemne{background:${tlo(Z.tloCiemne, k.ciemny)}}`;
+      if (Z.tloJasne) s += `.jasne{background:${tlo(Z.tloJasne, k.tlo)}}`;
+      if (Z.tloAkcent) s += `.akcent{background:${tlo(Z.tloAkcent, k.akcent)}}`;
+      if (k.tekstNaJasnym) s += `.jasne{color:${k.tekstNaJasnym}}`;
+      const anj = k.akcentNaJasnym;
+      if (anj) s += `.jasne .et,.jasne .ty b,.jasne .cyt,.jasne .au,.jasne .lb{color:${anj}}.jasne .li{background:${anj}}.jasne .os{border-color:${anj}}
+.jasne .btn,.jasne .et.pig{background:${anj};color:${k.tlo}}`;
+      if (k.etykietaNaJasnym) s += `.jasne .et:not(.pig){color:${k.etykietaNaJasnym}}`;
+      const t = f.tytul, x = f.tekst;
+      if (t.interlinia != null) s += `.ty{line-height:${t.interlinia}}`;
+      if (t.odstep != null) s += `.ty{letter-spacing:${t.odstep}em}`;
+      if (sys.wersja >= 2 && x.waga != null) s += `.tx{font-weight:${x.waga}}`;  // w v1 waga tekstu była pomijana
+      if (x.interlinia != null) s += `.tx{line-height:${x.interlinia}}`;
+      if (E.rodzina) s += `.et,.nr{font-family:"${fontNazwa(E.rodzina)}",var(--fx)}`;
+      if (E.waga != null) s += `.et,.nr{font-weight:${E.waga}}`;
+      if (E.odstep != null) s += `.et{letter-spacing:${E.odstep}em}`;
+      if (E.rozmiar != null) s += `.et,.nr{font-size:${E.rozmiar}px}`;
+      if (E.wersaliki != null) s += `.et{text-transform:${E.wersaliki ? 'uppercase' : 'none'}}`;
+      if (f.akcent === 'kursywa') s += '.c .ty b{font-style:italic;color:inherit}';
+      if (f.akcent === 'pogrubienie') s += '.c .ty b{font-weight:700;color:inherit}';
+      if (st.cienNaTytule === false) s += '.na-foto .ty{text-shadow:none}';
+      const mg = (sel, o) => (o && Object.keys(o).length ? `${sel}{${o.bok != null ? `--m:${o.bok}px;` : ''}${o.gora != null ? `--g:${o.gora}px;` : ''}${o.dol != null ? `--d:${o.dol}px;` : ''}}` : '');
+      s += mg('.c', M.post) + mg('.c.wysoki', M.story) + mg('.c.kw', M.kwadrat);
+      return s;
+    }
     // logo jasne na ciemnym tle i na zdjęciu, ciemne na jasnym; brak pliku = nazwa marki krojem tytułu
     const logoSrc = motyw => (motyw === 'jasne' ? L.naJasnym || L.naCiemnym : L.naCiemnym || L.naJasnym) || '';
     const logo = (motyw, styl = '') => { const s = logoSrc(motyw); return s ? `<img class="zn" src="${tekstHtml(s)}" alt="" style="${styl}">` : `<span class="zn-t">${zwykly(sys.marka.nazwa)}</span>`; };
     const znak = (motyw, w) => { const s = L.znak || logoSrc(motyw); return s ? `<img src="${tekstHtml(s)}" alt="" style="width:${w}px;max-height:${w}px;object-fit:contain">` : `<span class="zn-t" style="font-size:${Math.round(w / 3)}px">${zwykly(sys.marka.nazwa.slice(0, 2))}</span>`; };
     const zdjecie = n => n || '';
     const foto = (p, kl = 'foto', styl = '') => `<div class="${kl}${p.zdjecie ? '' : ' puste'}" style="${p.zdjecie ? `background-image:url('${cssUrl(p.zdjecie)}');` : ''}background-position:${cssUrl(p.kadr || '50% 50%').replace(/%/g, '% ').trim()};${styl}"></div>`;
-    const cien = p => { const a = p.cien === '' || p.cien == null ? st.cien : liczba(p.cien, 78) / 100;
+    const cien = p => {
+      // v2: przebieg i kolor cienia z systemu; pole „Przyciemnienie” skaluje krycie (100 = jak w systemie)
+      if (Z.cien) {
+        const s = p.cien === '' || p.cien == null ? 1 : Math.max(0, liczba(p.cien, 100)) / 100;
+        return `<div class="cien" style="background:linear-gradient(180deg,${Z.cien.stopy.map(([a, poz]) => `${rgba(Z.cien.kolor, Math.min(1, a * s))} ${poz}%`).join(',')})"></div>`;
+      }
+      const a = p.cien === '' || p.cien == null ? st.cien : liczba(p.cien, 78) / 100;
       return `<div class="cien" style="background:linear-gradient(180deg,rgba(0,0,0,${(a * .35).toFixed(2)}) 0%,rgba(0,0,0,0) 18%,rgba(0,0,0,0) 42%,rgba(0,0,0,${(a * .7).toFixed(2)}) 74%,rgba(0,0,0,${a.toFixed(2)}) 100%)"></div>`; };
     const gora = p => (p.nad || p.nr ? `<div class="gora">${p.nad ? `<span class="et ${st.etykieta === 'pigulka' ? 'pig' : ''}">${zwykly(p.nad)}</span>` : ''}${p.nr ? `<span class="nr">${zwykly(p.nr)}</span>` : ''}</div>` : '');
     const tytul = (p, r) => (p.tytul ? `<h1 class="ty" style="--t:${liczba(p.rozmiar, r)}px">${linie(p.tytul)}</h1>` : '');
@@ -178,7 +311,7 @@ html,body{overflow:hidden;background:transparent}
     };
     function szablon(p) {
       const format = FORMATY[p.format] ? p.format : 'post', fm = FORMATY[format];
-      const motyw = ['ciemne', 'jasne', 'akcent'].includes(p.tlo) ? p.tlo : 'ciemne';
+      const motyw = DOZW.includes(p.tlo) ? p.tlo : DOZW[0];
       const wymiar = `width:${fm.w}px;height:${fm.h}px`;
       if (format === 'poziom') {
         return `<div class="c ${motyw}" style="${wymiar}">${foto(p, 'prawa', 'width:540px')}
@@ -189,6 +322,7 @@ html,body{overflow:hidden;background:transparent}
       return `<div class="c ${naFoto ? 'ciemne na-foto' : motyw} ${format === 'story' ? 'wysoki' : format === 'kwadrat' ? 'kw' : ''}" style="${wymiar}">${TYPY[typ](p, motyw)}</div>`;
     }
     const nazwa = sys.marka.nazwa, konto = sys.marka.konto;
+    const DOZW = sys.tla?.dozwolone?.length ? sys.tla.dozwolone : TLA;
     const START = {
       okladka: { nad: 'Seria · temat', nr: '1/6', tytul: 'Zwykłe zdanie|i *jedno słowo*', rozmiar: 104, pod: '' },
       tekst: { tlo: 'jasne', nad: 'Seria · temat', nr: '2/6', tytul: 'Tytuł slajdu|*w dwóch wierszach*', rozmiar: 84, pod: 'Krótki tekst w jednym, dwóch zdaniach. *Najważniejsze* pogrubione.' },
@@ -200,15 +334,24 @@ html,body{overflow:hidden;background:transparent}
       poziom: { tlo: 'ciemne', nad: nazwa, tytul: 'Tytuł grafiki|*poziomej*', rozmiar: 56, pod: konto },
       baner: { tlo: 'ciemne', tytul: `${nazwa}|*hasło marki*`, rozmiar: 52 },
     };
+    // pola i ich opcje są wspólne – dla marki z ograniczonymi tłami albo własnym cieniem robimy kopię, nie zmieniamy wspólnych
+    const pola = { ...P }, polaTypow = { ...POLA_TYPOW };
+    if (DOZW.length < TLA.length) {
+      pola.tlo = { ...P.tlo, opcje: P.tlo.opcje.filter(([o]) => DOZW.includes(o)) };
+      for (const t of Object.values(START)) if (t.tlo && !DOZW.includes(t.tlo)) t.tlo = DOZW[0];
+      if (DOZW.length === 1) for (const t of Object.keys(polaTypow)) polaTypow[t] = polaTypow[t].filter(x => x !== 'tlo');
+    }
+    if (Z.cien) pola.cien = { ...P.cien, hint: '% siły cienia z systemu · puste = 100' };
     const podglad = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 5"><rect width="4" height="5" fill="${k.ciemny}"/><rect y="3.6" width="4" height=".08" fill="${k.akcent}"/></svg>`)}`;
     const przyklady = { zbiory: [], zdjecia: sys.zdjecia || [] };
     window.MARKI[id] = {
       id, nazwa, css, fonty: f.google || 'data:text/css,', zrodlo: sys.wczytano || 0,
-      formaty: FORMATY, typyFormatu: TYPY_FORMATU, nazwyTypow: NAZWY_TYPOW, pola: P, polaTypow: POLA_TYPOW, start: START,
+      formaty: FORMATY, typyFormatu: TYPY_FORMATU, nazwyTypow: NAZWY_TYPOW, pola, polaTypow, start: START,
       zdjecieUrl: zdjecie, miniatura: n => n, podgladPrzykladu: () => podglad,
       szablon, przyklady, async init() {},
     };
     return window.MARKI[id];
   };
   window.sprawdzSystem = sprawdzSystem;
+  window.gradientSystemu = gradientCss;  // podgląd pasków gradientu w profilu klienta
 })();
