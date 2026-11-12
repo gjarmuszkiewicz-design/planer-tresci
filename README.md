@@ -90,7 +90,29 @@ surowego CSS z pliku nie przyjmuje.
 | `styl.cienNaTytule` | `false` wyłącza cień pod tytułem na zdjęciu |
 | `tla.dozwolone` | tła do wyboru w edytorze, podzbiór `["ciemne", "jasne", "akcent"]`; przy jednym tle pole „Tło” znika |
 
-Pozostałe pola z paczki v2 (warianty logo, obrazy teł, kadr zdjęć, język, publikacje) aplikacja na razie pomija.
+| `zlozone.wygaszenie` | `{"kolor", "wysokosc"}` – wygaszenie dołu zdjęcia, gdy brakuje go pod napisem |
+| `marginesy.rolka` | `{"gora", "dol", "lewo", "prawo"}` – strefa okładki rolki |
+| `tla.ciemne`, `.jasne`, `.akcent` | obraz tła `{"pion", "poziom"}` (zamiast gradientu; poziom – grafiki poziome) |
+| `logo.podpis`, `logo.sygnet` | warianty `{"naCiemnym", "naJasnym", "naZdjeciu"}`; `logo.polaczenie` (sygnet + linia + podpis), `logo.znakWodny` (`wariant`, `pozycja`, `krycie`, `wysokosc`, `wyjscie`), `logo.rozmiary` |
+| `logo.uzycie` | który znak w którym szablonie: `{"okladka": {"gora": "sygnet", "stopka": "polaczenie", "znakWodny": true}, "zamkniecie": "polaczenie"}`; znaki: `sygnet`, `podpis`, `polaczenie`, `brak` |
+| `zdjecia[]` | `{"plik", "podglad", "opis", "w", "h", "glowa": {"gora", "broda", "x"}}` – opis w wyborze zdjęć, `glowa` (0–1) ustawia kadr „głowa do klatki” sam; `kadr.twarz` i `kadr.glowaOdGory` (per format) go stroją |
+| `zasady` | lista zasad – ściągawka nad formularzem w edytorze |
+| `wzorce` | `[{"grupa", "nazwa", "plik", "format", "typ"}]` – galeria „Wzorce systemu” w Grafikach (podgląd, pobranie, „Zrób podobną” w pasującym szablonie) |
+| `projekty` | gotowe projekty do skopiowania; `dokument` – PDF systemu |
+
+Szablon `zamkniecie` (plansza końcowa: podziękowanie, zaproszenie, połączenie znaków) jest w postach i relacjach.
+
+#### Paczka ZIP (`system-social-….zip`)
+
+W profilu klienta można wgrać całą paczkę zamiast samego JSON-a. Aplikacja czyta ją w przeglądarce (JSZip,
+`app/static/vendor/jszip.min.js`): `system-social.json` w katalogu głównym albo w jednym folderze, ścieżki względne
+(`logo/…`, `tla/…`, `zdjecia/…`, `wzorce/…`, `publikacje/…`, PDF). Limity: 150 MB paczki, 400 plików, 30 MB na plik,
+300 MB po rozpakowaniu; ścieżki z `..` albo bezwzględne są odrzucane. Pliki trafiają do mediów aplikacji (zdjęcia
+w oryginale z podglądem, SVG zamieniane na PNG), a ścieżki w pliku podmieniane na `/media/…`. Przed importem okno pyta, co
+przenieść do klienta: filary (`filary`), ton (`ton`), hashtagi, bio (do notatek), link do dokumentu PDF i publikacje
+z `publikacje[]` jako treści do akceptacji (ponowny import aktualizuje treść o tej samej dacie i tytule, nie dubluje).
+„Pobierz obecny (ZIP)” odtwarza paczkę z oryginalnymi ścieżkami. Sam JSON z względnymi ścieżkami jest odrzucany
+z podpowiedzią, by wgrać ZIP.
 
 Aplikacja sprawdza plik przy wgrywaniu i pokazuje, czego brakuje. Duże logo rastrowe zapisuje w grafikach aplikacji.
 Plik klienta nie trafia do panelu klienta.

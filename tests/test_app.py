@@ -150,6 +150,15 @@ def test_media_upload(client):
     assert client.post("/api/media", files={"file": ("a.txt", b"x", "text/plain")}).status_code == 400
 
 
+def test_media_pdf_for_brand_document(client):
+    # dokument systemu identyfikacji z paczki (PDF) trafia do mediów i wraca bez zmian
+    pdf = b"%PDF-1.4 " + b"x" * 500
+    r = client.post("/api/media", files={"file": ("system.pdf", pdf, "application/pdf")})
+    assert r.status_code == 200
+    got = TestClient(app).get(r.json()["url"] if "url" in r.json() else f"/media/{r.json()['id']}")
+    assert got.status_code == 200 and got.content == pdf and got.headers["content-type"] == "application/pdf"
+
+
 def test_media_download_original_and_zip(client):
     import io
     import zipfile
@@ -217,6 +226,16 @@ const base = f => JSON.parse(fs.readFileSync('app/marki/wspolny/' + f, 'utf8'));
 const ok = o => !window.sprawdzSystem(o).blad;
 const v2 = base('wzor-system-social.json'), zmien = f => { const o = JSON.parse(JSON.stringify(v2)); f(o); return o; };
 const brand = window.systemZPliku({ ...window.sprawdzSystem(zmien(o => { o.tla.dozwolone = ['ciemne', 'jasne']; })).system, wczytano: 1 }, 'k-x');
+// paczka ZIP po podmianie ścieżek na /media/…: warianty logo, znak wodny, zdjęcia z głową, wzorce, zasady, dokument
+const M = n => '/media/' + String(n).repeat(32).slice(0, 32);
+const paczka = o => { o.logo = { ...o.logo, podpis: { naCiemnym: M(1), naJasnym: M(2) }, sygnet: { naCiemnym: M(3), naZdjeciu: M(4) },
+  polaczenie: { linia: true }, znakWodny: { wariant: 'sygnet', pozycja: 'prawy-dol', krycie: 0.1 },
+  uzycie: { okladka: { gora: 'sygnet', stopka: 'polaczenie' }, tekst: { znakWodny: true }, zamkniecie: 'polaczenie' } };
+  o.zdjecia = [{ plik: M(5), podglad: M(6), opis: 'Garnitur', w: 2000, h: 3000, glowa: { gora: 0.1, broda: 0.3, x: 0.5 } }];
+  o.wzorce = [{ grupa: 'posty', nazwa: 'Cytat ciemny', plik: M(7), format: 'post' }];
+  o.zasady = ['Jeden znak na grafice']; o.dokument = M(8); };
+const pk = window.sprawdzSystem(zmien(paczka)), pkBrand = pk.system && window.systemZPliku({ ...pk.system, wczytano: 1 }, 'k-y');
+const blad = f => window.sprawdzSystem(zmien(o => { paczka(o); f(o); })).blad || '';
 console.log(JSON.stringify({
   v1: ok(base('wzor-system-social-v1.json')), v2: ok(v2), v3: ok(zmien(o => { o.wersja = 3; })),
   zlaStopa: ok(zmien(o => { o.zlozone.tloCiemne.stopy[0][0] = 'red'; })),
@@ -225,6 +244,14 @@ console.log(JSON.stringify({
   akcent: ok(zmien(o => { o.fonty.akcent = 'migotanie'; })),
   tla: brand.pola.tlo.opcje.map(x => x[0]),
   css: /radial-gradient\(ellipse 80% 60% at 50% 40%/.test(brand.css),
+  paczka: !pk.blad, zamkniecie: pkBrand.typyFormatu.post.includes('zamkniecie'),
+  wzorce: pkBrand.wzorce.length, zasady: pkBrand.zasady.length, dokument: pkBrand.dokument === M(8),
+  opis: pkBrand.opisZdjecia(M(5)),
+  sciezka: /paczki ZIP/.test(blad(o => { o.logo.podpis.naCiemnym = 'logo/podpis.png'; })),
+  wyjscie: !!blad(o => { o.wzorce[0].plik = '../../etc/passwd'; }),
+  glowa: !!blad(o => { o.zdjecia[0].glowa.broda = 0.05; }),
+  znak: !!blad(o => { o.logo.uzycie.okladka.gora = 'wszystko'; }),
+  dokumentZly: !!blad(o => { o.dokument = 'javascript:alert(1)'; }),
 }));
 """
 
@@ -241,7 +268,9 @@ def test_system_file_validator_v1_v2():
     root = Path(__file__).resolve().parents[1]
     out = json.loads(subprocess.run([node, "-e", VALIDATOR_JS], cwd=root, capture_output=True, text=True, check=True).stdout)
     assert out == {"v1": True, "v2": True, "v3": False, "zlaStopa": False, "ksztaltSrednik": False, "ksztaltUrl": False,
-                   "akcent": False, "tla": ["ciemne", "jasne"], "css": True}
+                   "akcent": False, "tla": ["ciemne", "jasne"], "css": True,
+                   "paczka": True, "zamkniecie": True, "wzorce": 1, "zasady": 1, "dokument": True, "opis": "Garnitur",
+                   "sciezka": True, "wyjscie": True, "glowa": True, "znak": True, "dokumentZly": True}
 
 
 def test_ai_assistant(client, monkeypatch):

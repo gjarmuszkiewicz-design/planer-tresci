@@ -408,10 +408,20 @@ function brandField(c) {
     ${v === 'plik' ? `<div class="sys-box">${s
       ? `<div><b>✓ ${esc(s.marka.nazwa)}</b> <span class="small muted">· plik ${esc(s.plik || '')}, wczytany ${fmtTs(s.wczytano)}</span></div>
          <div class="sys-kol">${['ciemny', 'jasny', 'akcent', 'tlo'].map(k => `<i style="background:${esc(s.kolory[k])}" title="${k} ${esc(s.kolory[k])}"></i>`).join('')}<span class="small muted">${esc(s.fonty.tytul.rodzina)} · ${esc(s.fonty.tekst.rodzina)}${s.fonty.akcent ? ` · akcent: ${esc(s.fonty.akcent)}` : ''} · wersja ${s.wersja || 1}</span></div>
-         ${sysV2Preview(s)}`
-      : '<div class="small muted">Wgraj plik systemu identyfikacji wygenerowany pod social media (system-social.json). Wszyscy klienci mają ten sam układ pliku.</div>'}
-      <div class="row wrap" style="gap:6px;margin-top:8px"><button class="btn sm" data-act="sys-upload">⤒ ${s ? 'Wgraj nowy plik' : 'Wgraj plik systemu'}</button>
-        ${s ? '<button class="btn sm ghost" data-act="sys-download">⤓ Pobierz obecny</button>' : ''}<a class="btn sm ghost" href="/marki/wspolny/wzor-system-social.json" download="wzor-system-social.json">Wzór pliku</a></div></div>` : ''}</div>`;
+         ${sysV2Preview(s)}${sysPaczka(s)}`
+      : '<div class="small muted">Wgraj paczkę systemu identyfikacji (system-social-….zip) albo sam plik system-social.json. Wszyscy klienci mają ten sam układ pliku.</div>'}
+      <div class="row wrap" style="gap:6px;margin-top:8px"><button class="btn sm" data-act="sys-upload">⤒ ${s ? 'Wgraj nową paczkę lub plik' : 'Wgraj paczkę lub plik'}</button>
+        ${s ? `<button class="btn sm ghost" data-act="sys-download">⤓ Pobierz obecny${s.paczka ? ' (ZIP)' : ''}</button>` : ''}<a class="btn sm ghost" href="/marki/wspolny/wzor-system-social.json" download="wzor-system-social.json">Wzór pliku</a></div></div>` : ''}</div>`;
+}
+// paczka: warianty logo, tła, liczba zdjęć, wzorców i dokument
+function sysPaczka(s) {
+  const L = s.logoV2 || {}, logos = [];
+  for (const w of ['podpis', 'sygnet']) for (const [m, ciemne] of [['naCiemnym', 1], ['naJasnym', 0], ['naZdjeciu', 1]]) if (L[w]?.[m]) logos.push(`<img class="${ciemne ? 'd' : ''}" src="${esc(L[w][m])}" title="${w} · ${m}" alt="">`);
+  const tla = Object.entries(s.tla || {}).filter(([k, v]) => v && typeof v === 'object' && !Array.isArray(v)).flatMap(([k, v]) => ['pion', 'poziom'].filter(u => v[u]).map(u => `<img class="tl" src="${esc(v[u])}" title="tło ${k} · ${u}" alt="">`));
+  const zd = (s.zdjecia || []).length, wz = (s.wzorce || []).length;
+  if (!logos.length && !tla.length && !wz && !s.dokument) return '';
+  return `${logos.length || tla.length ? `<div class="sys-pk">${logos.join('')}${tla.join('')}</div>` : ''}
+    <div class="small muted" style="margin-top:6px">${[zd && `${zd} zdjęć`, wz && `${wz} wzorców`, (s.zasady || []).length && `${s.zasady.length} zasad`, L.uzycie && 'znaki według szablonów'].filter(Boolean).join(' · ')}${s.dokument ? ` · <a href="${esc(s.dokument)}" target="_blank" rel="noopener">dokument systemu (PDF)</a>` : ''}</div>`;
 }
 // v2: pełna paleta z nazwami i paski gradientów (CSS gradientu buduje system.js ze sprawdzonej struktury)
 function sysV2Preview(s) {
@@ -426,8 +436,168 @@ function sysV2Preview(s) {
     ${s.tla?.dozwolone ? `<div class="small muted" style="margin-top:6px">Dozwolone tła: ${s.tla.dozwolone.join(', ')}</div>` : ''}`;
 }
 // wgranie pliku systemu: sprawdzenie układu, duże logo rastrowe trafia do /media, żeby stan klienta był lekki
+
+/* ---------- paczka systemu identyfikacji (ZIP): manifest system-social.json v2 + pliki ---------- */
+// Kolejność: rozpakowanie i wstępne sprawdzenie → okno z wyborem, co przejąć → wgranie plików do /media
+// (podgląd postępu) → podmiana ścieżek na adresy /media → sprawdzSystem → zapis systemu, ustawień i treści.
+const PACZKA = { maxZip: 150e6, maxPlikow: 400, maxPlik: 30e6, maxRazem: 300e6 };
+const SCIEZKA_RE = /^[a-z0-9][a-z0-9_.\-/]*\.(png|jpe?g|webp|gif|svg|pdf|txt)$/;
+const TYP_PLIKU = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', svg: 'image/svg+xml', pdf: 'application/pdf', txt: 'text/plain' };
+const extOf = p => (p.match(/\.(\w+)$/) || [])[1]?.toLowerCase() || '';
+async function czytajPaczke(file) {
+  if (file.size > PACZKA.maxZip) throw new Error('Paczka jest za duża (maks. 150 MB).');
+  if (!window.JSZip) await loadScript('/static/vendor/jszip.min.js');
+  let zip; try { zip = await JSZip.loadAsync(file); } catch { throw new Error('To nie jest poprawny plik ZIP.'); }
+  const wpisy = Object.values(zip.files).filter(f => !f.dir);
+  if (wpisy.length > PACZKA.maxPlikow) throw new Error(`Paczka ma ${wpisy.length} plików – maksymalnie ${PACZKA.maxPlikow}.`);
+  const zla = wpisy.find(f => /(^|[\\/])\.\.([\\/]|$)/.test(f.name) || /^[\\/]|^[a-z]:/i.test(f.name));
+  if (zla) throw new Error(`Niedozwolona ścieżka w paczce: ${zla.name}`);
+  // manifest w katalogu głównym albo w jednym folderze nadrzędnym (paczka spakowana razem z folderem)
+  const man = wpisy.filter(f => /(^|\/)system-social\.json$/.test(f.name)).sort((a, b) => a.name.length - b.name.length)[0];
+  if (!man) throw new Error('W paczce nie ma pliku system-social.json.');
+  const baza = man.name.slice(0, -'system-social.json'.length);
+  let manifest; try { manifest = JSON.parse(await man.async('string')); } catch { throw new Error('system-social.json w paczce nie jest poprawnym JSON.'); }
+  if (manifest?.typ !== 'system-social') throw new Error('system-social.json w paczce nie jest plikiem systemu identyfikacji.');
+  let razem = 0;
+  const plik = async sc => {
+    const f = zip.file(baza + sc); if (!f) throw new Error(`Manifest wskazuje plik, którego nie ma w paczce: ${sc}`);
+    const blob = await f.async('blob');
+    if (blob.size > PACZKA.maxPlik) throw new Error(`Plik ${sc} jest większy niż 30 MB.`);
+    if ((razem += blob.size) > PACZKA.maxRazem) throw new Error('Paczka po rozpakowaniu przekracza 300 MB.');
+    return new File([blob], sc.split('/').pop(), { type: TYP_PLIKU[extOf(sc)] || 'application/octet-stream' });
+  };
+  return { manifest, plik, ma: sc => !!zip.file(baza + sc) };
+}
+// ścieżki plików w manifeście (bez publikacji, które mają pliki względem własnego folderu)
+function sciezkiManifestu(m) {
+  const out = new Set();
+  const walk = o => { for (const [k, v] of Object.entries(o || {})) {
+    if (k === 'publikacje') continue;
+    if (typeof v === 'string' && SCIEZKA_RE.test(v) && v.includes('/') && !v.includes('..')) out.add(v);
+    else if (v && typeof v === 'object') walk(v);
+  } };
+  walk(m);
+  return [...out];
+}
+const podmien = (o, mapa) => { for (const [k, v] of Object.entries(o || {})) {
+  if (typeof v === 'string' && mapa[v]) o[k] = mapa[v];
+  else if (v && typeof v === 'object') podmien(v, mapa);
+} return o; };
+const pubSciezka = (pub, nazwa) => (nazwa.includes('/') ? nazwa : `${String(pub.folder || '').replace(/\/+$/, '')}/${nazwa}`);
+const FORMAT_PUB = { karuzela: 'Karuzela', post: 'Post', relacja: 'Relacja', rolka: 'Rolka', wideo: 'Wideo' };
+const pubKey = (cid, date, title) => `${cid}|${date}|${pkey(title || '')}`;
+
+async function importPaczki(c, file) {
+  if (!window.sprawdzSystem) await loadScript('/marki/wspolny/system.js');
+  const pk = await czytajPaczke(file), m = pk.manifest;
+  const sciezki = sciezkiManifestu(m);
+  for (const sc of sciezki) if (!pk.ma(sc)) throw new Error(`Manifest wskazuje plik, którego nie ma w paczce: ${sc}`);
+  // wstępne sprawdzenie układu, zanim cokolwiek wyślemy
+  const proba = podmien(structuredClone(m), Object.fromEntries(sciezki.map((sc, i) => [sc, `/media/${String(i).padStart(32, '0')}`])));
+  const { blad } = sprawdzSystem(proba);
+  if (blad) throw new Error(blad);
+  const pubs = (Array.isArray(m.publikacje) ? m.publikacje : []).filter(p => p && /^\d{4}-\d{2}-\d{2}$/.test(p.data || ''));
+  for (const p of pubs) for (const g of p.grafiki || []) if (!pk.ma(pubSciezka(p, g))) throw new Error(`Publikacja „${p.tytul}”: brak pliku ${pubSciezka(p, g)}`);
+  const istn = new Map(postsOf(c.id).map(p => [pubKey(c.id, p.date, p.title), p]));
+  const j = m.jezyk || {}, filary = Array.isArray(m.filary) ? m.filary.filter(f => f?.name) : [];
+  const tagi = [...(j.hashtagi?.stale || []), ...(j.hashtagi?.tematyczne || [])].join(' ');
+  const opcja = (id, on, label, sub) => `<label class="st-check imp-opt"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}> <span><b>${label}</b>${sub ? `<br><span class="small muted">${sub}</span>` : ''}</span></label>`;
+  const ok = await new Promise(res => {
+    modal(`<div class="modal-h"><h2 style="font-size:18px">Paczka systemu: ${esc(m.marka?.nazwa || '')}</h2></div>
+      <div class="modal-b">
+        <div class="small muted" style="margin-bottom:12px">${esc(file.name)} · ${fmtSize(file.size)} · ${sciezki.length} plików systemu${pubs.length ? `, ${pubs.length} publikacji` : ''}. System identyfikacji klienta zostanie zastąpiony nowym.</div>
+        ${filary.length ? opcja('impPil', true, `Filary treści (${filary.length})`, c.pillars.length ? `zastąpią obecne (${c.pillars.length}): ${esc(c.pillars.map(p => p.name).join(', '))}` : esc(filary.map(f => f.name).join(', '))) : ''}
+        ${j.ton ? opcja('impTon', true, 'Ton komunikacji', c.tone ? 'zastąpi obecny opis tonu' : '') : ''}
+        ${tagi ? opcja('impTag', true, 'Hashtagi', esc(tagi)) : ''}
+        ${j.bio ? opcja('impBio', true, 'Bio do notatek', 'dopisane na końcu notatek wewnętrznych') : ''}
+        ${m.dokument && pk.ma(m.dokument) ? opcja('impDok', true, 'Dokument systemu (PDF)', 'link „System komunikacji (PDF)” w materiałach klienta') : ''}
+        ${pubs.length ? opcja('impPub', true, `Publikacje do planu (${pubs.length})`, `${pubs.map(p => `${fmtShort(p.data)} · ${esc(p.tytul || '')}${istn.has(pubKey(c.id, p.data, p.tytul)) ? ' <b>(aktualizacja)</b>' : ''}`).join('<br>')}<br>Trafią do akceptacji klienta; treść z tą samą datą i tematem zostanie zaktualizowana, nie zdublowana.`) : ''}
+      </div>
+      <div class="modal-f"><button class="btn" data-imp="0">Anuluj</button><button class="btn primary" data-imp="1">Wgraj paczkę</button></div>`);
+    const h = e => { const b = e.target.closest('[data-imp], [data-act="close-modal"]'); if (!b) return;
+      const wyb = b.dataset.imp === '1' ? Object.fromEntries(['impPil', 'impTon', 'impTag', 'impBio', 'impDok', 'impPub'].map(id => [id, !!$('#' + id)?.checked])) : null;
+      document.removeEventListener('click', h, true); res(wyb); };
+    document.addEventListener('click', h, true);
+  });
+  if (!ok) { closeModal(); return; }
+  // wgrywanie z paskiem postępu
+  const doWgrania = [...sciezki.filter(sc => sc !== m.dokument || ok.impDok)];
+  const pubPliki = ok.impPub ? pubs.flatMap(p => [...(p.grafiki || []).map(g => pubSciezka(p, g)), ...(/\.txt$/.test(p.opis || '') ? [pubSciezka(p, p.opis)] : [])]) : [];
+  const wszystkie = [...new Set([...doWgrania, ...pubPliki])];
+  modal(`<div class="modal-h"><h2 style="font-size:18px">Wgrywam paczkę…</h2></div><div class="modal-b"><div class="imp-bar"><i id="impBar"></i></div><div class="small muted" id="impTxt" style="margin-top:8px"></div></div>`);
+  const mapa = {}, info = {}, teksty = {};
+  const zdjecia = new Set((Array.isArray(m.zdjecia) ? m.zdjecia : []).map(z => z?.plik || z));
+  const raw = async (f, sc) => { const fd = new FormData(); fd.append('file', f, f.name); fd.append('name', sc); return (await api('POST', '/api/media', fd)).url; };
+  for (const [i, sc] of wszystkie.entries()) {
+    $('#impBar') && ($('#impBar').style.width = `${Math.round(i / wszystkie.length * 100)}%`);
+    $('#impTxt') && ($('#impTxt').textContent = `Wgrywam ${i + 1}/${wszystkie.length}: ${sc}`);
+    const f = await pk.plik(sc), ext = extOf(sc);
+    try {
+      if (ext === 'txt') { teksty[sc] = (await f.text()).slice(0, 20000); continue; }
+      if (ext === 'svg') { const md = await blobToMedia(f, f.name.replace(/\.svg$/, '.png'), 1500); mapa[sc] = md.src; continue; }  // SVG zapisujemy jako PNG
+      if (ext === 'pdf') { mapa[sc] = await raw(f, sc); continue; }
+      if (zdjecia.has(sc) || pubPliki.includes(sc)) { const md = await postImageToMedia(f, sc.split('/').pop()); mapa[sc] = md.orig; info[sc] = md; continue; }
+      mapa[sc] = await raw(f, sc);  // logo, tła, wzorce: oryginał bez zmian
+    } catch (e) { closeModal(); throw new Error(`${sc}: ${e.message}`); }
+  }
+  // manifest z adresami /media; zdjęcia dostają podgląd i wymiary (potrzebne do automatycznego kadru)
+  const gotowy = structuredClone(m);
+  delete gotowy.publikacje;
+  if (Array.isArray(gotowy.zdjecia)) gotowy.zdjecia = gotowy.zdjecia.map(z => { const sc = z?.plik || z, md = info[sc]; return md ? { ...(typeof z === 'object' ? z : {}), plik: md.orig, podglad: md.src, w: md.w, h: md.h } : z; });
+  if (!ok.impDok) delete gotowy.dokument;
+  podmien(gotowy, mapa);
+  const { system, blad: b2 } = sprawdzSystem(gotowy);
+  if (b2) { closeModal(); throw new Error(b2); }
+  c.system = { ...system, plik: file.name.slice(0, 80), wczytano: Date.now(),
+    paczka: Object.fromEntries(Object.entries(mapa).filter(([sc]) => !pubPliki.includes(sc) || doWgrania.includes(sc))) };
+  c.brand = 'plik';
+  // ustawienia klienta
+  if (ok.impPil) c.pillars = filary.slice(0, 20).map(f => { const old = c.pillars.find(p => pkey(p.name) === pkey(f.name));
+    return { id: old?.id || uid(), goal: '', audience: '', desc: '', what: '', examples: '', avoid: '', tips: '', ...old,
+      ...Object.fromEntries(Object.entries(f).filter(([k, v]) => ['name', 'goal', 'audience', 'desc', 'what', 'examples', 'avoid', 'tips'].includes(k) && typeof v === 'string').map(([k, v]) => [k, v.slice(0, 2000)])),
+      color: /^#[0-9a-f]{6}$/i.test(f.color || '') ? f.color : old?.color || PILLAR_COLORS[0] }; });
+  if (ok.impTon) c.tone = String(j.ton).slice(0, 4000);
+  if (ok.impTag) c.hashtags = tagi.slice(0, 2000);
+  if (ok.impBio && !String(c.notes || '').includes(String(j.bio).trim())) c.notes = `${c.notes ? c.notes.trim() + '\n\n' : ''}Bio:\n${String(j.bio).trim()}`.slice(0, 8000);
+  if (ok.impDok && system.dokument) {
+    const url = new URL(system.dokument, location.origin).href, ls = (c.links = linksOf(c).filter(l => l.name !== 'System komunikacji (PDF)'));
+    ls.unshift({ name: 'System komunikacji (PDF)', url });
+  }
+  // treści z paczki: nowa albo aktualizacja tej z tą samą datą i tematem
+  let nowe = 0, akt = 0;
+  if (ok.impPub) for (const p of pubs) {
+    let opis = /\.txt$/.test(p.opis || '') ? teksty[pubSciezka(p, p.opis)] || '' : String(p.opis || '');
+    let hashtags = String(p.hashtagi || '');
+    if (!hashtags) { const ak = opis.trim().split(/\n\s*\n/); if (ak.length > 1 && /^#/.test(ak.at(-1).trim())) { hashtags = ak.pop().trim(); opis = ak.join('\n\n'); } }
+    const kan = p.kanaly || { meta: true, li: false };
+    const pola = { title: String(p.tytul || '').slice(0, 300), format: FORMAT_PUB[pkey(p.format || '')] || p.format || 'Post', meta: kan.meta !== false, li: !!kan.li,
+      time: /^\d{1,2}:\d{2}$/.test(p.godzina || '') ? p.godzina : '', pillar: p.filar || '', onGraphic: p.naGrafice || '', cta: p.cta || '', hashtags, brief: p.brief || '',
+      [kan.meta === false && kan.li ? 'copyLi' : 'copyMeta']: opis.trim(), media: (p.grafiki || []).map(g => info[pubSciezka(p, g)]).filter(Boolean) };
+    const stara = istn.get(pubKey(c.id, p.data, p.tytul));
+    if (stara) { Object.assign(stara, pola); akt++; }
+    else { state.posts.push(newPost({ clientId: c.id, date: p.data, month: p.data.slice(0, 7), week: '', approval: 'pending', ...pola })); nowe++; }
+  }
+  closeModal(); save(true); render();
+  toast(`Wczytano paczkę „${system.marka.nazwa}”${ok.impPub ? ` · treści: ${nowe} nowych, ${akt} zaktualizowanych` : ''}`, 6000);
+}
+// „Pobierz obecny”: system z paczki wraca jako ZIP z tymi samymi ścieżkami plików, system z samego JSON – jako JSON
+async function pobierzSystem(c) {
+  const { plik, wczytano, paczka, ...s } = c.system;
+  const pobierz = (blob, nazwa) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nazwa; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
+  if (!paczka || !Object.keys(paczka).length) return pobierz(new Blob([JSON.stringify(s, null, 2)], { type: 'application/json' }), plik?.endsWith('.json') ? plik : 'system-social.json');
+  toast('Składam paczkę…');
+  if (!window.JSZip) await loadScript('/static/vendor/jszip.min.js');
+  const zip = new JSZip(), wstecz = Object.fromEntries(Object.entries(paczka).map(([sc, u]) => [u, sc]));
+  const man = podmien(structuredClone(s), wstecz);
+  if (Array.isArray(man.zdjecia)) man.zdjecia = man.zdjecia.map(({ podglad, w, h, ...z }) => z);
+  const { logoV2, ...reszta } = man;
+  zip.file('system-social.json', JSON.stringify({ ...reszta, logo: { ...(logoV2 || {}), ...man.logo } }, null, 2));
+  for (const [sc, u] of Object.entries(paczka)) zip.file(sc, await (await fetch(u)).blob());
+  pobierz(await zip.generateAsync({ type: 'blob' }), plik?.endsWith('.zip') ? plik : 'system-social.zip');
+}
 async function uploadSystem(c) {
-  const [f] = await pickFiles('.json,application/json', false); if (!f) return;
+  const [f] = await pickFiles('.zip,.json,application/zip,application/json', false); if (!f) return;
+  if (/\.zip$/i.test(f.name) || /zip/.test(f.type)) { try { await importPaczki(c, f); } catch (e) { closeModal(); toast(e.message, 8000); } return; }
   try {
     if (f.size > 3e6) throw new Error('Plik jest za duży (maks. 3 MB).');
     let raw; try { raw = JSON.parse(await f.text()); } catch { throw new Error('To nie jest poprawny plik JSON.'); }
@@ -448,9 +618,7 @@ document.addEventListener('click', e => {
   const el = e.target.closest('[data-act="sys-upload"], [data-act="sys-download"]'); if (!el || PORTAL_TOKEN) return;
   const c = clientById(route().id); if (!c) return;
   if (el.dataset.act === 'sys-upload') return uploadSystem(c);
-  const { plik, wczytano, ...s } = c.system;
-  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(s, null, 2)], { type: 'application/json' }));
-  a.download = plik || 'system-social.json'; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  return pobierzSystem(c).catch(err => toast(err.message, 6000));
 });
 
 /* ================= client views ================= */
@@ -986,7 +1154,7 @@ document.addEventListener('scroll', e => {
 }, true);
 const findPost = id => (drawer && drawer.draft.id === id) ? drawer.draft : state.posts.find(p => p.id === id);
 let lb = null;
-function openLb(pid, i) { const p = findPost(pid); if (!p?.media.length) return; lb = { p, i: Math.min(i, p.media.length - 1) }; renderLb(); }
+function openLb(pid, i, p0) { const p = p0 || findPost(pid); if (!p?.media.length) return; lb = { p, i: Math.min(i, p.media.length - 1) }; renderLb(); }
 function closeLb() { lb = null; $('#lb')?.remove(); }
 function renderLb() {
   let el = $('#lb'); if (!el) { el = document.createElement('div'); el.id = 'lb'; document.body.appendChild(el); }

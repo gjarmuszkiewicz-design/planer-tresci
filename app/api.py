@@ -32,6 +32,7 @@ ID_RE = re.compile(r"^[A-Za-z0-9_-]{4,40}$")
 TOKEN_RE = re.compile(r"^[a-f0-9]{24,64}$")
 MONTH_RE = re.compile(r"^\d{4}-\d{2}$")
 IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp", "image/gif"}
+MEDIA_TYPES = IMAGE_TYPES | {"application/pdf"}  # PDF: dokument systemu identyfikacji z paczki klienta
 
 
 def _check_id(value: str, what: str = "identyfikator") -> str:
@@ -221,8 +222,8 @@ def add_comment(post_id: str, body: CommentBody, user: User = Depends(current_us
 @router.post("/api/media")
 async def upload_media(file: UploadFile = File(...), name: str = Form(""),
                        _user: User = Depends(current_user), db: Session = Depends(get_db)):
-    if file.content_type not in IMAGE_TYPES:
-        raise HTTPException(400, "Obsługiwane są obrazy PNG, JPG, WEBP i GIF.")
+    if file.content_type not in MEDIA_TYPES:
+        raise HTTPException(400, "Obsługiwane są obrazy PNG, JPG, WEBP i GIF oraz dokumenty PDF.")
     data = await file.read(settings.max_upload_mb * 1024 * 1024 + 1)
     if len(data) > settings.max_upload_mb * 1024 * 1024:
         raise HTTPException(413, f"Plik jest większy niż {settings.max_upload_mb} MB.")
@@ -233,7 +234,7 @@ async def upload_media(file: UploadFile = File(...), name: str = Form(""),
     return {"id": m.id, "url": f"/media/{m.id}"}
 
 
-EXT = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif"}
+EXT = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif", "application/pdf": "pdf"}
 MAX_ZIP_FILES = 30
 MAX_ZIP_MB = 400
 

@@ -82,10 +82,37 @@ function stGallery() {
     ${mine.length ? `<div class="st-grid">${mine.map(d => card(d.thumb || m.podgladPrzykladu('t10'), d.name || 'Bez nazwy', `${fmt(d)} · ${fmtTs(d.updatedAt)}`,
       `data-sa="open" data-id="${esc(d.id)}"`, `<button class="st-del" data-sa="del" data-id="${esc(d.id)}" title="Usuń projekt">✕</button>`)).join('')}</div>`
       : '<div class="st-none muted">Nie masz jeszcze zapisanych projektów. Zacznij od nowej grafiki albo od gotowego projektu poniżej.</div>'}
+    ${stWzorce(m)}
     ${m.przyklady.zbiory.map((z, zi) => `<h2 class="st-h2">${esc(z.nazwa)}</h2>
       <div class="st-grid">${z.projekty.map((p, i) => card(m.podgladPrzykladu(p.id), p.nazwa, `${fmt(p)}${p.typ ? ' · ' + (m.nazwyTypow[p.typ] || '') : ''}`,
         `data-sa="example" data-z="${zi}" data-i="${i}" title="Otwórz jako nowy projekt"`)).join('')}</div>`).join('')}
   </div>`;
+}
+
+// Wzorce systemu: gotowe PNG z paczki klienta (podgląd i pobranie) + „Zrób podobną” w pasującym szablonie
+const WZOR_TYP = [[/zamkniecie|plansza|koncow/, 'zamkniecie'], [/okladka/, 'okladka'], [/tresc/, 'tekst'], [/cytat.*zdjeci/, 'okladka'], [/cytat/, 'cytat'],
+  [/liczba|wynik/, 'liczba'], [/podpis|nakladka|zdjecie/, 'zdjecie'], [/pytanie|kontakt|link|nowy post|zaproszenie/, 'cta'], [/baner|okladka fb/, 'baner'], [/poziom/, 'poziom']];
+function stWzorTyp(m, w) {
+  const format = m.formaty[w.format] ? w.format : 'post', typy = m.typyFormatu[format], n = `${w.nazwa} ${w.grupa}`.toLowerCase().replace(/ł/g, 'l').normalize('NFD').replace(/[̀-ͯ]/g, '');
+  let typ = w.typ && typy.includes(w.typ) ? w.typ : '';
+  if (!typ && w.grupa === 'wyroznione') typ = 'wyroznione';
+  if (!typ && /profil|awatar/.test(n)) typ = 'awatar';
+  if (!typ && w.grupa === 'logo') typ = format === 'kwadrat' ? 'awatar' : 'logo';
+  typ ||= WZOR_TYP.find(([re, t]) => re.test(n) && typy.includes(t))?.[1] || typy[0];
+  return { format, typ: typy.includes(typ) ? typ : typy[0] };
+}
+function stWzorce(m) {
+  const ws = m.wzorce || []; if (!ws.length) return '';
+  const grupy = [...new Set(ws.map(w => w.grupa || 'inne'))];
+  return `<h2 class="st-h2">Wzorce systemu <span class="muted small" style="font-weight:400">· ${ws.length} gotowych grafik z systemu identyfikacji</span></h2>
+    ${grupy.map(g => `<div class="st-wg"><div class="st-wg-h">${esc(g)}</div><div class="st-grid">${ws.map((w, i) => [w, i]).filter(([w]) => (w.grupa || 'inne') === g).map(([w, i]) => `<div class="st-card st-wz">
+      <div class="st-thumb" data-sa="wzor-lb" data-i="${i}" title="Powiększ"><img src="${esc(w.plik)}" alt="" loading="lazy"></div>
+      <div class="st-cap"><b>${esc(w.nazwa || 'Wzorzec')}</b><span>${esc(m.formaty[w.format]?.nazwa || '')}</span></div>
+      <div class="st-wz-act"><button class="btn sm" data-sa="wzor" data-i="${i}">Zrób podobną</button><a class="btn sm ghost" href="${esc(w.plik)}?dl=1&n=${encodeURIComponent(`${m.nazwa} ${g} ${w.nazwa}`)}" download title="Pobierz PNG">⤓</a></div></div>`).join('')}</div></div>`).join('')}`;
+}
+function stZasady(m) {
+  const z = m.zasady || []; if (!z.length) return '';
+  return `<details class="st-zasady" ${studio.zasadyOpen ? 'open' : ''}><summary>Zasady systemu (${z.length})</summary><ol>${z.map(x => `<li>${esc(x)}</li>`).join('')}</ol></details>`;
 }
 
 function stField(m, d, k) {
@@ -103,7 +130,8 @@ function stField(m, d, k) {
     const photos = m.przyklady.zdjecia;
     return `<div class="field">${label}<div class="st-foto">${d.zdjecie ? `<img src="${esc(m.miniatura(d.zdjecie))}" alt="">` : '<span class="st-nofoto">brak zdjęcia</span>'}
         <div class="col"><button class="btn sm" data-sa="foto-up">⤒ Wgraj zdjęcie</button>${photos.length ? `<button class="btn sm ghost" data-sa="foto-toggle">${studio.pickFoto ? 'Ukryj przykładowe' : 'Wybierz z przykładowych'}</button>` : ''}</div></div>
-      ${studio.pickFoto ? `<div class="st-photos">${photos.map(n => `<img src="${esc(m.miniatura(n))}" alt="" title="${esc(n)}" class="${n === d.zdjecie ? 'on' : ''}" data-sa="foto-pick" data-v="${esc(n)}" loading="lazy">`).join('')}</div>` : ''}</div>`;
+      ${studio.pickFoto ? `<div class="st-photos">${photos.map(n => `<img src="${esc(m.miniatura(n))}" alt="" title="${esc(m.opisZdjecia?.(n) || n)}" class="${n === d.zdjecie ? 'on' : ''}" data-sa="foto-pick" data-v="${esc(n)}" loading="lazy">`).join('')}</div>` : ''}
+      ${d.zdjecie && !d.kadr && m.opisZdjecia?.(d.zdjecie) ? '<div class="small muted" style="margin-top:4px">Kadr ustawiony automatycznie („głowa do klatki”) – przeciągnij zdjęcie, aby zmienić.</div>' : ''}</div>`;
   }
   return `<div class="field">${label}<input class="input" data-sf="${k}" value="${esc(v)}"></div>`;
 }
@@ -111,7 +139,8 @@ function stField(m, d, k) {
 function stForm() {
   const d = studio.cur, m = brandOf(d.brand);
   const typy = m.typyFormatu[d.format];
-  return `<div class="field"><label>Rodzaj grafiki</label><select class="select" data-sf="format">${Object.entries(m.formaty).map(([k, f]) =>
+  return `${stZasady(m)}${studio.wzor ? `<div class="st-ref"><img src="${esc(studio.wzor.plik)}" alt=""><div><b>Wzorzec:</b> ${esc(studio.wzor.nazwa)}<br><span class="small muted">Grafika powstaje w szablonie aplikacji – wzorzec jest punktem odniesienia.</span></div></div>` : ''}
+    <div class="field"><label>Rodzaj grafiki</label><select class="select" data-sf="format">${Object.entries(m.formaty).map(([k, f]) =>
       `<option value="${k}" ${k === d.format ? 'selected' : ''}>${esc(f.nazwa)} · ${esc(f.opis)}</option>`).join('')}</select></div>
     ${typy.length > 1 ? `<div class="field"><label>Szablon</label><select class="select" data-sf="typ">${typy.map(t => `<option value="${t}" ${t === d.typ ? 'selected' : ''}>${esc(m.nazwyTypow[t])}</option>`).join('')}</select></div>` : ''}
     <div class="st-sep"></div>
@@ -299,7 +328,7 @@ function stNew(base) {
   const { id, ...rest } = base || {};
   studio.cur = { ...(base ? rest : m.start[typ]), brand: m.id, format, typ: format === 'poziom' ? 'poziom' : typ, name: base?.nazwa || base?.name || 'Nowa grafika' };
   delete studio.cur.nazwa;
-  studio.dirty = false; studio.pickFoto = false;
+  studio.dirty = false; studio.pickFoto = false; studio.wzor = null;
   if (location.hash === `${stBase()}/nowy`) render(); else location.hash = `${stBase()}/nowy`;
 }
 const stLeave = () => !studio.dirty || confirm('Masz niezapisane zmiany w grafice. Wyjść bez zapisywania?');
@@ -318,6 +347,13 @@ document.addEventListener('click', async e => {
       break;
     }
     case 'example': stNew(structuredClone(m.przyklady.zbiory[+el.dataset.z].projekty[+el.dataset.i])); break;
+    case 'wzor': {
+      const w = m.wzorce[+el.dataset.i], { format, typ } = stWzorTyp(m, w);
+      stNew({ ...structuredClone(m.start[typ] || {}), format, typ, nazwa: `Na wzór: ${w.nazwa}` });
+      studio.wzor = w; render();
+      break;
+    }
+    case 'wzor-lb': openLb(null, +el.dataset.i, { media: m.wzorce.map(w => ({ type: 'image', src: w.plik, orig: w.plik, name: w.nazwa })) }); break;
     case 'open': if (!e.target.closest('.st-del')) location.hash = `${stBase()}/p/${el.dataset.id}`; break;
     case 'del': {
       const d = stDesign(el.dataset.id); if (!confirm(`Usunąć projekt „${d?.name || 'bez nazwy'}”? Grafiki dodane do treści zostaną w planie.`)) return;
@@ -331,7 +367,7 @@ document.addEventListener('click', async e => {
     case 'at-mode': stAttachModal($('#stAtClient').value, el.dataset.v); break;
     case 'attach-do': stAttach(); break;
     case 'foto-toggle': studio.pickFoto = !studio.pickFoto; stRedrawForm(); break;
-    case 'foto-pick': studio.cur.zdjecie = el.dataset.v; delete studio.cur.styl; stMarkDirty(); stRedrawForm(); stPaint(); break;
+    case 'foto-pick': studio.cur.zdjecie = el.dataset.v; delete studio.cur.styl; delete studio.cur.kadr; stMarkDirty(); stRedrawForm(); stPaint(); break;
     case 'foto-up': {
       const [f] = await pickFiles('image/*,.jfif,.webp,.avif', false); if (!f) return;
       toast('Wgrywam zdjęcie…');
@@ -383,3 +419,6 @@ document.addEventListener('pointermove', e => {
   stSetKadr(s.k[0] - (e.clientX - s.x) / s.w * 100, s.k[1] - (e.clientY - s.y) / s.h * 100);
 });
 document.addEventListener('pointerup', () => { stDragFrom = null; });
+
+// stan ściągawki zasad przetrwa przerysowanie formularza
+document.addEventListener('toggle', e => { if (e.target.classList?.contains('st-zasady')) studio.zasadyOpen = e.target.open; }, true);
