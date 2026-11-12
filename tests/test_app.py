@@ -236,6 +236,12 @@ const paczka = o => { o.logo = { ...o.logo, podpis: { naCiemnym: M(1), naJasnym:
   o.zasady = ['Jeden znak na grafice']; o.dokument = M(8); };
 const pk = window.sprawdzSystem(zmien(paczka)), pkBrand = pk.system && window.systemZPliku({ ...pk.system, wczytano: 1 }, 'k-y');
 const blad = f => window.sprawdzSystem(zmien(o => { paczka(o); f(o); })).blad || '';
+// kreator „Własny układ”: warstwy w formacie LinkedIn 1200×1200, złośliwe wartości nie przechodzą do HTML
+const wl = pkBrand.szablon({ typ: 'wlasny', format: 'likwadrat', tlo: 'jasne', warstwy: [
+  { id: 'a1', rodzaj: 'zdjecie', pelne: true, plik: M(5) }, { id: 'a2', rodzaj: 'cien', sila: 80 },
+  { id: 'a3', rodzaj: 'tekst', styl: 'tytul', tresc: '<script>x</script>|*akcent*', x: 90, y: 600, w: 1000, rozmiar: 90, kolor: 'red;background:url(x)' },
+  { id: 'a4', rodzaj: 'logo', wariant: 'polaczenie', h: 70, x: 90, y: 1040 }, { id: 'a5', rodzaj: 'zdjecie', plik: 'javascript:alert(1)', x: 0, y: 0, w: 100, h: 100 },
+  { id: 'a6', rodzaj: 'ksztalt', wypelnienie: 'tloCiemne', x: 0, y: 0, w: 50, h: 50 }, { id: 'a"7', rodzaj: 'linia', kolor: '#ff0000', x: 1, y: 1, w: 9 } ] });
 console.log(JSON.stringify({
   v1: ok(base('wzor-system-social-v1.json')), v2: ok(v2), v3: ok(zmien(o => { o.wersja = 3; })),
   zlaStopa: ok(zmien(o => { o.zlozone.tloCiemne.stopy[0][0] = 'red'; })),
@@ -252,6 +258,9 @@ console.log(JSON.stringify({
   glowa: !!blad(o => { o.zdjecia[0].glowa.broda = 0.05; }),
   znak: !!blad(o => { o.logo.uzycie.okladka.gora = 'wszystko'; }),
   dokumentZly: !!blad(o => { o.dokument = 'javascript:alert(1)'; }),
+  wlFormat: pkBrand.typyFormatu.likwadrat.includes('wlasny') && /width:1200px;height:1200px/.test(wl),
+  wlWarstwy: (wl.match(/data-w="/g) || []).length,
+  wlBezpieczny: !/<script|javascript:|red;|a"7/.test(wl) && /&lt;script&gt;/.test(wl) && /#ff0000/.test(wl),
 }));
 """
 
@@ -270,7 +279,8 @@ def test_system_file_validator_v1_v2():
     assert out == {"v1": True, "v2": True, "v3": False, "zlaStopa": False, "ksztaltSrednik": False, "ksztaltUrl": False,
                    "akcent": False, "tla": ["ciemne", "jasne"], "css": True,
                    "paczka": True, "zamkniecie": True, "wzorce": 1, "zasady": 1, "dokument": True, "opis": "Garnitur",
-                   "sciezka": True, "wyjscie": True, "glowa": True, "znak": True, "dokumentZly": True}
+                   "sciezka": True, "wyjscie": True, "glowa": True, "znak": True, "dokumentZly": True,
+                   "wlFormat": True, "wlWarstwy": 7, "wlBezpieczny": True}
 
 
 def test_ai_assistant(client, monkeypatch):

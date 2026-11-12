@@ -102,6 +102,16 @@ surowego CSS z pliku nie przyjmuje.
 
 Szablon `zamkniecie` (plansza końcowa: podziękowanie, zaproszenie, połączenie znaków) jest w postach i relacjach.
 
+Formaty LinkedIn: post jak Instagram `post` (1080 × 1350), post kwadratowy `likwadrat` (1200 × 1200), post poziomy
+`poziom` (1200 × 627). `kwadrat` (1080 × 1080) zostaje dla awatara i okładek wyróżnionych relacji.
+
+**Kreator „Własny układ”** (szablon `wlasny` w każdym formacie, przycisk „✎ Własny układ” w Grafikach): wybierasz format,
+a grafikę składasz od zera z warstw – zdjęcie w tle albo w ramce (zdjęcia systemu, kadr „głowa do klatki”), cień z systemu,
+logo (podpis, sygnet, połączenie, wersje na ciemne/jasne tło i na zdjęcie), nagłówek, opis, etykieta, liczba, znak cytatu,
+przycisk, linia, kształt (kolor albo gradient systemu), znak wodny. Teksty mają kroje i style systemu, kolory tylko z systemu
+(z paletą). Warstwy przeciąga się na podglądzie (przyciąganie do środka), strzałki przesuwają o 1/10 px, Delete usuwa;
+przy zmianie formatu układ skaluje się sam. Projekt zapisuje się jak inne (`warstwy` w danych projektu).
+
 #### Paczka ZIP (`system-social-….zip`)
 
 W profilu klienta można wgrać całą paczkę zamiast samego JSON-a. Aplikacja czyta ją w przeglądarce (JSZip,

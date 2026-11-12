@@ -267,20 +267,24 @@
 
   /* ---------- wspólne formaty i szablony ---------- */
   const FORMATY = {
-    post: { w: 1080, h: 1350, nazwa: 'Post / slajd karuzeli', opis: 'Instagram i Facebook, 1080 × 1350' },
+    post: { w: 1080, h: 1350, nazwa: 'Post / slajd karuzeli', opis: 'Instagram, Facebook i LinkedIn, 1080 × 1350' },
     story: { w: 1080, h: 1920, nazwa: 'Relacja / okładka rolki', opis: '1080 × 1920' },
     kwadrat: { w: 1080, h: 1080, nazwa: 'Awatar / okładka wyróżnionej relacji', opis: '1080 × 1080' },
-    poziom: { w: 1200, h: 627, nazwa: 'Grafika pozioma', opis: 'LinkedIn i link, 1200 × 627' },
+    likwadrat: { w: 1200, h: 1200, nazwa: 'Post kwadratowy LinkedIn', opis: '1200 × 1200' },
+    poziom: { w: 1200, h: 627, nazwa: 'Post poziomy LinkedIn / link', opis: '1200 × 627' },
     fb: { w: 1640, h: 624, nazwa: 'Okładka Facebooka', opis: '1640 × 624' },
     lifirma: { w: 2256, h: 382, nazwa: 'Baner LinkedIn – firma', opis: '2256 × 382' },
     liosoba: { w: 1584, h: 396, nazwa: 'Baner LinkedIn – osoba', opis: '1584 × 396' },
   };
   const PIONOWE = ['okladka', 'tekst', 'cytat', 'liczba', 'zdjecie', 'cta', 'zamkniecie', 'logo'];
-  const TYPY_FORMATU = { post: PIONOWE, story: PIONOWE, kwadrat: ['awatar', 'wyroznione'], poziom: ['poziom'], fb: ['baner'], lifirma: ['baner'], liosoba: ['baner'] };
+  // „wlasny” – kreator: grafika złożona od zera z warstw (tło, zdjęcia, logo, teksty, dodatki) z materiałów systemu
+  const TYPY_FORMATU = { post: [...PIONOWE, 'wlasny'], story: [...PIONOWE, 'wlasny'], kwadrat: ['awatar', 'wyroznione', 'wlasny'],
+    likwadrat: [...PIONOWE.filter(t => t !== 'logo'), 'wlasny'], poziom: ['poziom', 'wlasny'],
+    fb: ['baner', 'wlasny'], lifirma: ['baner', 'wlasny'], liosoba: ['baner', 'wlasny'] };
   const NAZWY_TYPOW = {
     okladka: 'Okładka na zdjęciu', tekst: 'Slajd z treścią', cytat: 'Cytat', liczba: 'Liczba / wynik', zdjecie: 'Zdjęcie z podpisem osoby',
     cta: 'Zaproszenie z wezwaniem', zamkniecie: 'Zamknięcie na zdjęciu', logo: 'Samo logo', awatar: 'Awatar (znak)', wyroznione: 'Okładka wyróżnionej relacji',
-    poziom: 'Tekst i zdjęcie obok siebie', baner: 'Logo i hasło',
+    poziom: 'Tekst i zdjęcie obok siebie', baner: 'Logo i hasło', wlasny: 'Własny układ (kreator od zera)',
   };
   const P = {
     tlo: { label: 'Tło', typ: 'select', opcje: [['ciemne', 'Ciemne'], ['jasne', 'Jasne'], ['akcent', 'Kolor akcentu']] },
@@ -312,6 +316,7 @@
     logo: ['tlo'], awatar: ['tlo'], wyroznione: ['tlo', 'tytul'],
     poziom: ['tlo', 'zdjecie', 'kadr', 'nad', 'tytul', 'rozmiar', 'pod'],
     baner: ['tlo', 'tytul', 'rozmiar', 'logo'],
+    wlasny: ['tlo'],
   };
 
   const CSS_WSPOLNY = `
@@ -364,6 +369,9 @@ html,body{overflow:hidden;background:transparent}
 .pol .pl{align-self:stretch;background:currentColor}
 .zn-s{display:block;width:auto;object-fit:contain}
 .wyg{position:absolute;left:0;right:0;bottom:0}
+.wl-txt .ty,.wl-txt .tx,.wl-txt .lb,.wl-txt .cyt,.wl-txt .btn{margin:0}
+.wl-txt .cyt{height:auto;line-height:.8;overflow:visible}
+.wl-pusty{background:repeating-linear-gradient(45deg,rgba(127,127,127,.25) 0 20px,rgba(127,127,127,.12) 20px 40px);border:3px dashed rgba(127,127,127,.6)}
 `;
 
   window.MARKI = window.MARKI || {};
@@ -445,7 +453,7 @@ html,body{overflow:hidden;background:transparent}
     const kadrAuto = (p, w, h) => {
       if (p.kadr || !p.zdjecie) return null;
       const z = ZD.find(x => x.plik === p.zdjecie || x.podglad === p.zdjecie); if (!z?.glowa || !z.w || !z.h) return null;
-      const fm = p.format === 'story' ? 'story' : p.format === 'kwadrat' ? 'kwadrat' : 'post';
+      const fm = p.format === 'story' ? 'story' : p.format === 'kwadrat' || p.format === 'likwadrat' ? 'kwadrat' : 'post';
       const twarz = KD.twarz?.[fm] ?? (h / w > 1.6 ? 0.29 : h / w > 1.1 ? 0.36 : 0.40), glowa = KD.glowaOdGory?.[fm] ?? (h / w > 1.6 ? 0.12 : 0.085);
       const ar = z.h / z.w, g = z.glowa;
       const IW = Math.max(w, twarz * h / ((g.broda - g.gora) * ar)), IH = IW * ar;
@@ -496,17 +504,70 @@ html,body{overflow:hidden;background:transparent}
       wyroznione: (p, m) => `<div class="cnt">${glowny('wyroznione', m, 300, znak(m, 300))}<div class="ty" style="--t:84px;margin-top:44px">${zwykly(p.tytul || '')}</div></div>`,
       baner: (p, m) => `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:70px;padding:0 90px">${glowny('baner', m, liczba(p.logo, 380) / 4, logo(m, `height:auto;width:${liczba(p.logo, 380)}px;max-width:none`))}${p.tytul ? `<h1 class="ty" style="--t:${liczba(p.rozmiar, 52)}px">${linie(p.tytul)}</h1>` : ''}</div>`,
     };
+    /* ---------- kreator „Własny układ”: warstwy w px formatu, wszystko z materiałów systemu ---------- */
+    const PALETA = (Array.isArray(k.paleta) ? k.paleta : []).filter(x => x && HEX2.test(x.hex || ''));
+    const KOL_W = { jasny: 'var(--jasny)', ciemny: 'var(--ciemny)', akcent: 'var(--akcent)', tlo: 'var(--tlo)' };
+    if (k.akcentNaJasnym) KOL_W.akcentNaJasnym = k.akcentNaJasnym;
+    const kolorW = v => (!v || v === 'auto' ? '' : KOL_W[v] || (HEX2.test(v) ? v : ''));
+    const WYPEL = { tloCiemne: [Z.tloCiemne, k.ciemny], tloJasne: [Z.tloJasne, k.tlo], tloAkcent: [Z.tloAkcent, k.akcent] };
+    const kadrPoz = v => cssUrl(v || '50% 50%').replace(/%/g, '% ').trim();
+    const ZNAKI_W = ['podpis', 'sygnet', 'polaczenie'];
+    const warstwa = (w, p, motyw) => {
+      if (!w || typeof w !== 'object') return '';
+      const id = String(w.id || '').replace(/[^a-z0-9]/gi, '').slice(0, 24);
+      const x = Math.round(liczba(w.x, 0)), y = Math.round(liczba(w.y, 0)), sz = Math.max(4, liczba(w.w, 400)), wy = Math.max(1, liczba(w.h, sz));
+      const op = Math.max(0, Math.min(1, liczba(w.krycie, 100) / 100)), obr = liczba(w.obrot, 0);
+      const baza = `position:absolute;left:${x}px;top:${y}px;opacity:${op};${obr ? `transform:rotate(${obr}deg);` : ''}`;
+      const kol = kolorW(w.kolor), r = Math.max(0, liczba(w.zaokr, 0));
+      const blok = (wnetrze, styl = '', kl = '') => `<div data-w="${id}" class="${kl}" style="${baza}${styl}">${wnetrze}</div>`;
+      const pelny = wnetrze => `<div data-w="${id}" data-full="1" style="position:absolute;inset:0;opacity:${op}">${wnetrze}</div>`;
+      switch (w.rodzaj) {
+        case 'zdjecie': {
+          const ok = typeof w.plik === 'string' && OBRAZ.test(w.plik);
+          if (w.pelne) return pelny(ok ? foto({ zdjecie: w.plik, kadr: w.kadr, format: p.format }) : '<div class="foto puste"></div>');
+          return blok('', `width:${sz}px;height:${wy}px;border-radius:${r}px;${ok ? `background:url('${cssUrl(w.plik)}') ${kadrPoz(w.kadr)}/cover no-repeat` : ''}`, ok ? '' : 'wl-pusty');
+        }
+        case 'cien': return pelny(cien({ cien: w.sila }));
+        case 'logo': {
+          const m2 = ['ciemne', 'jasne', 'foto'].includes(w.motyw) ? w.motyw : motyw === 'jasne' ? 'jasne' : 'ciemne';
+          const zn = ZNAKI_W.includes(w.wariant) ? w.wariant : 'podpis', h = Math.max(10, liczba(w.h, 80));
+          return blok(zn === 'podpis' && !LV.podpis ? logo(m2 === 'foto' ? 'ciemne' : m2, `height:${h}px;max-width:none`) : znakWg(zn, m2, h), `height:${h}px;display:flex;align-items:center`);
+        }
+        case 'tekst': {
+          const rozm = Math.max(8, liczba(w.rozmiar, 48)), c = kol ? `color:${kol};` : '', t = w.tresc || '';
+          const wyr = ['left', 'center', 'right'].includes(w.wyr) ? `text-align:${w.wyr};` : '';
+          const cienT = w.cienTekstu ? 'text-shadow:0 2px 30px rgba(0,0,0,.45);' : '';
+          const wn = {
+            tytul: () => `<h1 class="ty" style="--t:${rozm}px;${c}${cienT}">${linie(t)}</h1>`,
+            etykieta: () => `<span class="et ${st.etykieta === 'pigulka' ? 'pig' : ''}" style="font-size:${rozm}px;${c}${cienT}">${zwykly(t)}</span>`,
+            liczba: () => `<div class="lb" style="--n:${rozm}px;${c}${cienT}">${zwykly(t)}</div>`,
+            cytat: () => `<div class="cyt" style="font-size:${rozm}px;${c}">“</div>`,
+            przycisk: () => `<span class="btn" style="font-size:${rozm}px;padding:${Math.round(rozm * .75)}px ${Math.round(rozm * 1.3)}px;${kol ? `background:${kol};` : ''}">${zwykly(t)}</span>`,
+          }[w.styl] || (() => `<p class="tx" style="font-size:${rozm}px;${c}${cienT}">${pogrubienia(t).replace(/\n/g, '<br>')}</p>`);
+          return blok(wn(), `width:${sz}px;${wyr}`, 'wl-txt');
+        }
+        case 'linia': return blok('', `width:${sz}px;height:${Math.max(1, liczba(w.h, 3))}px;background:${kol || 'var(--akcent)'};border-radius:${r}px`);
+        case 'ksztalt': {
+          const g = WYPEL[w.wypelnienie];
+          return blok('', `width:${sz}px;height:${wy}px;border-radius:${r}px;background:${g ? tlo(g[0], g[1]) : kol || 'var(--akcent)'}`);
+        }
+        default: return '';
+      }
+    };
+    const wlasny = (p, motyw) => (Array.isArray(p.warstwy) ? p.warstwy : []).slice(0, 80).map(w => warstwa(w, p, motyw)).join('');
+    const klasaFormatu = (format, fm) => (format === 'story' ? 'wysoki' : format === 'kwadrat' || format === 'likwadrat' ? 'kw' : fm.w > fm.h ? 'poz' : '');
     function szablon(p) {
       const format = FORMATY[p.format] ? p.format : 'post', fm = FORMATY[format];
       const motyw = DOZW.includes(p.tlo) ? p.tlo : DOZW[0];
       const wymiar = `width:${fm.w}px;height:${fm.h}px`;
+      if (p.typ === 'wlasny') return `<div class="c ${motyw} ${klasaFormatu(format, fm)}" style="${wymiar}">${wlasny(p, motyw)}</div>`;
       if (format === 'poziom') {
         return `<div class="c poz ${motyw}" style="${wymiar}">${foto(p, 'prawa', 'width:540px')}
           <div class="lewa" style="width:660px">${logo(motyw, 'height:48px')}<div>${p.nad ? `<span class="et ${st.etykieta === 'pigulka' ? 'pig' : ''}" style="font-size:18px;display:inline-block;margin-bottom:16px">${zwykly(p.nad)}</span>` : ''}${tytul(p, 56)}${p.pod ? `<p class="tx" style="font-size:22px;margin-top:14px">${pogrubienia(p.pod)}</p>` : ''}</div></div></div>`;
       }
       const typ = TYPY_FORMATU[format].includes(p.typ) ? p.typ : TYPY_FORMATU[format][0];
       const naFoto = ['okladka', 'zdjecie', 'zamkniecie'].includes(typ);
-      return `<div class="c ${naFoto ? 'ciemne na-foto' : motyw} ${format === 'story' ? 'wysoki' : format === 'kwadrat' ? 'kw' : FORMATY[format].w > FORMATY[format].h ? 'poz' : ''}" style="${wymiar}">${TYPY[typ](p, motyw)}</div>`;
+      return `<div class="c ${naFoto ? 'ciemne na-foto' : motyw} ${klasaFormatu(format, fm)}" style="${wymiar}">${TYPY[typ](p, motyw)}</div>`;
     }
     const nazwa = sys.marka.nazwa, konto = sys.marka.konto;
     const DOZW = sys.tla?.dozwolone?.length ? sys.tla.dozwolone : TLA;
@@ -521,6 +582,7 @@ html,body{overflow:hidden;background:transparent}
       logo: { tlo: 'ciemne' }, awatar: { tlo: 'ciemne' }, wyroznione: { tlo: 'ciemne', tytul: 'Realizacje' },
       poziom: { tlo: 'ciemne', nad: nazwa, tytul: 'Tytuł grafiki|*poziomej*', rozmiar: 56, pod: konto },
       baner: { tlo: 'ciemne', tytul: `${nazwa}|*hasło marki*`, rozmiar: 52 },
+      wlasny: { tlo: 'ciemne', warstwy: [] },
     };
     // pola i ich opcje są wspólne – dla marki z ograniczonymi tłami albo własnym cieniem robimy kopię, nie zmieniamy wspólnych
     const pola = { ...P }, polaTypow = { ...POLA_TYPOW };
@@ -543,6 +605,15 @@ html,body{overflow:hidden;background:transparent}
       zdjecieUrl: zdjecie, miniatura, opisZdjecia, podgladPrzykladu: podgladProjektu,
       wzorce: sys.wzorce || [], zasady: sys.zasady || [], dokument: sys.dokument || '',
       szablon, przyklady, async init() {},
+      // materiały dla kreatora „Własny układ” (znaki, kolory i wypełnienia z systemu)
+      kreator: {
+        znaki: [['polaczenie', 'Sygnet + podpis (połączenie)'], ['podpis', 'Podpis / logo'], ['sygnet', 'Sygnet']]
+          .filter(([z]) => z === 'podpis' || (z === 'polaczenie' ? LV.sygnet && LV.podpis : LV.sygnet || L.znak)),
+        kolory: [['auto', 'Automatycznie (do tła)'], ['jasny', 'Jasny'], ['ciemny', 'Ciemny'], ['akcent', 'Akcent'], ['tlo', 'Jasne tło'],
+          ...(k.akcentNaJasnym ? [['akcentNaJasnym', 'Akcent na jasnym']] : []), ...PALETA.map(x => [x.hex, x.nazwa || x.hex])],
+        wypelnienia: [['', 'Kolor'], ...[['tloCiemne', 'Gradient ciemny'], ['tloJasne', 'Gradient jasny'], ['tloAkcent', 'Gradient akcentu']].filter(([g]) => Z[g])],
+        znakWodny: LV.znakWodny || null, cta: sys.teksty.cta,
+      },
     };
     return window.MARKI[id];
   };
