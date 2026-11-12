@@ -150,6 +150,27 @@ def test_media_upload(client):
     assert client.post("/api/media", files={"file": ("a.txt", b"x", "text/plain")}).status_code == 400
 
 
+def test_media_download_original_and_zip(client):
+    import io
+    import zipfile
+    jpg = b"\xff\xd8\xff\xe0" + bytes(range(256)) * 40  # bajty muszą wrócić bez zmian
+    ids = []
+    for name, data, ct in (("a.png", PNG, "image/png"), ("b.jpg", jpg, "image/jpeg")):
+        r = client.post("/api/media", files={"file": (name, data, ct)}, data={"name": name})
+        ids.append(r.json()["id"])
+    pub = TestClient(app)  # pobieranie działa też w panelu klienta (bez logowania)
+    r = pub.get(f"/media/{ids[1]}", params={"dl": 1, "n": "Kawiarnia 2026-11-06 Post: SEO/ąę"})
+    assert r.status_code == 200 and r.content == jpg
+    cd = r.headers["content-disposition"]
+    assert cd.startswith("attachment;") and ".jpg" in cd and "/" not in cd.split("filename*=")[1].replace("%2F", "")
+    r = pub.get("/media-zip", params={"ids": ",".join(ids), "n": "Karuzela"})
+    assert r.status_code == 200 and r.headers["content-type"] == "application/zip"
+    z = zipfile.ZipFile(io.BytesIO(r.content))
+    assert z.namelist() == ["Karuzela 01.png", "Karuzela 02.jpg"]
+    assert z.read("Karuzela 02.jpg") == jpg
+    assert pub.get("/media-zip", params={"ids": "../etc"}).status_code in (400, 404)
+
+
 def test_designs_and_brand_files_only_for_agency(client):
     anon = TestClient(app)
     assert anon.get("/marki/wizme/marka.js").status_code == 401

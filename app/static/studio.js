@@ -270,7 +270,8 @@ async function stAttach() {
   if (openAfter && studio.dirty) { await stSave(); if (studio.dirty) return; }
   await stRun('attach', async () => {
     const d = studio.cur, canvas = await stCanvas();
-    const m = await blobToMedia(await canvasBlob(canvas), `${fileName(d)}.png`, 2400);
+    // grafika trafia do treści jako oryginalny PNG w pełnej rozdzielczości formatu
+    const m = await postImageToMedia(new File([await canvasBlob(canvas)], `${fileName(d)}.png`, { type: 'image/png' }));
     if (!post) { post = newPost(fresh); state.posts.push(post); }
     post.media.push(m);
     save(true);

@@ -509,6 +509,10 @@ function pillarsBar(c, posts) {
 function mediaCell(p) {
   const m = p.media[0];
   if (!m) return `<span class="thumb">—</span>`;
+  const n = p.media.filter(mediaFileId).length, dl = n > 1 ? dlAllHref(p) : n ? dlHref(p, p.media.findIndex(mediaFileId)) : '';
+  return `<div class="mcell">${mediaThumbCell(p, m)}${dl ? `<a class="mdl" data-act="dl" href="${dl}" download title="${n > 1 ? `Pobierz wszystkie (${n}) – ZIP` : 'Pobierz grafikę'}">⤓${n > 1 ? ' ' + n : ''}</a>` : ''}</div>`;
+}
+function mediaThumbCell(p, m) {
   const t = mediaThumb(m);
   return t ? `<span class="thumb" style="padding:0"><img src="${esc(t)}" style="width:100%;height:100%;object-fit:cover;border-radius:7px" onerror="this.replaceWith(document.createTextNode('🔗'))">${p.media.length > 1 ? `<span class="n">${p.media.length}</span>` : ''}</span>` : `<span class="thumb">🔗</span>`;
 }
@@ -742,6 +746,60 @@ function blobToMedia(blob, name, max = 1600) {
     img.src = url;
   });
 }
+// Zdjęcie / grafika do planu publikacji: oryginał trafia na serwer bajt w bajt (100% jakości – to ten plik
+// pobieramy do publikacji), a aplikacja wyświetla lżejszy podgląd. Mały plik służy od razu za podgląd.
+const ORIG_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+const blobSize = blob => new Promise(res => {
+  const u = URL.createObjectURL(blob), i = new Image();
+  i.onload = () => { URL.revokeObjectURL(u); res({ w: i.naturalWidth, h: i.naturalHeight }); };
+  i.onerror = () => { URL.revokeObjectURL(u); res({ w: 0, h: 0 }); };
+  i.src = u;
+});
+async function postImageToMedia(file, name) {
+  name = name || file.name || 'obraz';
+  const f = typedImage(file);
+  if (!ORIG_TYPES.includes(f.type)) return fileToMedia(f);  // np. AVIF – tylko przekonwertowana kopia
+  const dim = await blobSize(f);
+  if (!dim.w) throw new Error(`${name}: nie udało się odczytać obrazu – zapisz go jako PNG lub JPG.`);
+  const fd = new FormData(); fd.append('file', f, name); fd.append('name', name);
+  let up;
+  try { up = await api('POST', '/api/media', fd); } catch (e) { throw new Error(`${name}: ${e.message}`); }
+  const base = { id: up.id, type: 'image', name, w: dim.w, h: dim.h, size: f.size, orig: up.url };
+  if (f.type === 'image/gif' || (Math.max(dim.w, dim.h) <= 1600 && f.size <= 1.5e6)) return { ...base, src: up.url };
+  const prev = await blobToMedia(f, name);
+  return { ...base, src: prev.src };
+}
+function typedImage(file) {
+  if (/^(video|audio)\//.test(file.type) || /\.(mp4|mov|avi|webm|mp3|wav|pdf|docx?|xlsx?|zip)$/i.test(file.name || '')) {
+    throw new Error(`${file.name}: to nie jest obraz. Wideo i dokumenty dodaj jako link.`);
+  }
+  if (file.type && file.type !== 'application/octet-stream') return file;
+  const ext = ((file.name || '').match(/\.(\w+)$/) || [])[1]?.toLowerCase();
+  const guess = { svg: 'image/svg+xml', png: 'image/png', gif: 'image/gif', webp: 'image/webp', avif: 'image/avif' }[ext] || 'image/jpeg';
+  return new File([file], file.name || 'obraz', { type: guess });
+}
+// pobieranie: oryginał (starsze grafiki mają tylko zmniejszoną kopię), nazwa pliku z klienta, terminu i tematu
+const mediaFileId = m => (m?.type === 'image' && ((m.orig || m.src || '').match(/^\/media\/([a-f0-9]{32})$/) || [])[1]) || '';
+const dlBase = p => [clientById(p.clientId)?.name, p.date || (p.week ? 'tydzien ' + p.week : ''), p.title].filter(Boolean).join(' ').slice(0, 80);
+function dlHref(p, i) {
+  const id = mediaFileId(p.media[i]); if (!id) return '';
+  const imgs = p.media.filter(mediaFileId).length;
+  return `/media/${id}?dl=1&n=${encodeURIComponent(dlBase(p) + (imgs > 1 ? ' ' + pad(p.media.filter(mediaFileId).indexOf(p.media[i]) + 1) : ''))}`;
+}
+function dlAllHref(p) {
+  const ids = p.media.map(mediaFileId).filter(Boolean);
+  return ids.length > 1 ? `/media-zip?ids=${ids.join(',')}&n=${encodeURIComponent(dlBase(p))}` : '';
+}
+const fmtSize = b => b >= 1e6 ? `${(b / 1e6).toFixed(1).replace('.', ',')} MB` : `${Math.max(1, Math.round(b / 1e3))} kB`;
+// przyciski pobierania przy treści: jedno zdjęcie albo wszystkie (ZIP) – w edytorze, panelu klienta i podglądzie
+function dlBar(p) {
+  const n = p.media.filter(mediaFileId).length; if (!n) return '';
+  const first = p.media.findIndex(mediaFileId), old = p.media.some(m => mediaFileId(m) && !m.orig);
+  return `<div class="dl-bar">${n > 1
+    ? `<a class="btn sm" data-act="dl" href="${dlAllHref(p)}" download>⤓ Pobierz wszystkie (${n}) – ZIP</a>`
+    : `<a class="btn sm" data-act="dl" href="${dlHref(p, first)}" download>⤓ Pobierz grafikę</a>`}
+    <span class="small muted">${old ? 'część grafik wgrano przed zmianą – są w zmniejszonej wersji' : 'oryginalna jakość, gotowe do publikacji'}</span></div>`;
+}
 // Nie ufamy samemu rozszerzeniu ani typowi z systemu (Windows zapisuje JPG jako .jfif, czasem bez typu) –
 // próbujemy odczytać każdy plik, a odrzucamy dopiero ten, którego przeglądarka naprawdę nie otworzy.
 function fileToMedia(file, max) {
@@ -919,11 +977,12 @@ function openLb(pid, i) { const p = findPost(pid); if (!p?.media.length) return;
 function closeLb() { lb = null; $('#lb')?.remove(); }
 function renderLb() {
   let el = $('#lb'); if (!el) { el = document.createElement('div'); el.id = 'lb'; document.body.appendChild(el); }
-  const { p, i } = lb, n = p.media.length, m = p.media[i], t = mediaThumb(m);
+  const { p, i } = lb, n = p.media.length, m = p.media[i], t = m.orig || mediaThumb(m), dl = dlHref(p, i);
   el.innerHTML = `<div class="lb"><div class="lb-bg" data-act="lb-close"></div>
     ${t ? `<img src="${esc(t)}" alt="">` : `<div class="lb-ph">🔗 ${esc(m.name || 'Materiał z linku')}<br><a href="${esc(m.url)}" target="_blank" rel="noopener" style="color:#a5b4fc">otwórz link</a></div>`}
     ${n > 1 ? `<button class="lb-btn lb-prev" data-act="lb-nav" data-d="-1" ${i === 0 ? 'hidden' : ''}>‹</button><button class="lb-btn lb-next" data-act="lb-nav" data-d="1" ${i === n - 1 ? 'hidden' : ''}>›</button>` : ''}
     <button class="lb-btn lb-x" data-act="lb-close" title="Zamknij (Esc)">✕</button>
+    ${dl ? `<div class="lb-dl"><a class="btn sm" data-act="dl" href="${dl}" download>⤓ Pobierz</a>${n > 1 && dlAllHref(p) ? `<a class="btn sm" data-act="dl" href="${dlAllHref(p)}" download>⤓ Wszystkie (ZIP)</a>` : ''}</div>` : ''}
     <div class="lb-cap"><b>${i + 1} / ${n}</b>${m.name ? ' · ' + esc(m.name) : ''}${m.w ? ` · ${m.w}×${m.h}` : ''} · pełna grafika bez przycięcia</div></div>`;
 }
 const pvTabsFor = p => [...(p.meta ? ['ig', ...(isStory(p.format) ? [] : ['grid']), 'fb'] : []), ...(p.li ? ['li'] : [])];
@@ -1007,8 +1066,10 @@ function renderDrawer() {
         <div class="row" style="margin-top:8px"><input class="input" id="linkIn" placeholder="Link do Dysku Google / WeTransfer / Canva…"><button class="btn" data-act="add-link">Dodaj link</button></div>
         <div class="media-list">${d.media.map((m, i) => { const t = mediaThumb(m); return `<div class="mi">
           ${t ? `<img class="im" src="${esc(t)}" alt="" onerror="this.outerHTML='<div class=im>🔗 link</div>'">` : `<div class="im">🔗 ${esc(m.name || 'link')}</div>`}
-          <div class="ctl">${i > 0 ? `<button data-act="m-left" data-i="${i}" title="Przesuń w lewo">◀</button>` : ''}<button data-act="m-del" data-i="${i}" title="Usuń">✕</button></div>
-          <div class="cap">${i + 1}. ${m.type === 'link' ? `<a href="${esc(m.url)}" target="_blank" rel="noopener">${esc(m.name || 'link')}</a>` : esc(m.name || '')}</div></div>`; }).join('')}</div>
+          <div class="ctl">${dlHref(d, i) ? `<a data-act="dl" href="${dlHref(d, i)}" download title="Pobierz${m.orig ? ' oryginał' : ''}">⤓</a>` : ''}${i > 0 ? `<button data-act="m-left" data-i="${i}" title="Przesuń w lewo">◀</button>` : ''}<button data-act="m-del" data-i="${i}" title="Usuń">✕</button></div>
+          <div class="cap">${i + 1}. ${m.type === 'link' ? `<a href="${esc(m.url)}" target="_blank" rel="noopener">${esc(m.name || 'link')}</a>` : esc(m.name || '')}</div>
+          ${m.type === 'image' ? `<div class="cap q">${m.orig ? `${m.w}×${m.h}${m.size ? ' · ' + fmtSize(m.size) : ''}` : 'zmniejszona'}</div>` : ''}</div>`; }).join('')}</div>
+        ${dlBar(d)}
 
         <div class="sec">Akceptacja i publikacja</div>
         <div class="field"><label>Do potwierdzenia z klientem <span class="hint">· klient zobaczy to pytanie przy poście</span></label><textarea class="input" data-f="toConfirm" rows="2" style="min-height:48px" placeholder="np. Czy liontower.pl to adres nowej strony?">${esc(d.toConfirm)}</textarea></div>
@@ -1058,7 +1119,7 @@ function commentsHtml(list, forClient) {
 }
 async function addMedia(files) {
   for (const f of files) {
-    try { drawer.draft.media.push(await fileToMedia(f)); } catch (e) { toast(e.message); }
+    try { drawer.draft.media.push(await postImageToMedia(f)); } catch (e) { toast(e.message, 6000); }
   }
   drawer.dirty = true; renderDrawerKeepScroll();
 }
@@ -1102,6 +1163,7 @@ function viewPortal(token) {
       ${p.toConfirm ? `<div class="ask"><b>❓ Do potwierdzenia:</b> ${esc(p.toConfirm)}</div>` : ''}
       ${kv('Założenie', p.brief)}${kv('Tekst na grafice', p.onGraphic)}${kv('Oznaczenia', p.mentions)}
       ${p.media.filter(m => m.type === 'link').map(m => `<a class="small" href="${esc(m.url)}" target="_blank" rel="noopener">🔗 ${esc(m.name || 'Materiał')} – otwórz</a>`).join('')}
+      ${dlBar(p)}
       <div class="approve-bar">
         <button class="btn ok" data-act="c-accept" data-id="${p.id}" ${p.approval === 'accepted' ? 'disabled' : ''}>✓ ${p.approval === 'accepted' ? 'Zaakceptowano' : 'Akceptuję'}</button>
         <button class="btn bad" data-act="c-changes" data-id="${p.id}">✎ Poproś o zmiany</button>
@@ -1588,7 +1650,8 @@ async function doImport() {
         try {
           const img = an.wb.getImage(im.imageId);
           const blob = new Blob([img.buffer], { type: 'image/' + (img.extension === 'jpg' ? 'jpeg' : img.extension) });
-          target.media.unshift(await blobToMedia(blob, `${s.name} – wiersz ${im.row}.${img.extension}`)); imgs++;
+          const nm = `${s.name} – wiersz ${im.row}.${img.extension}`;
+          target.media.unshift(await postImageToMedia(new File([blob], nm, { type: blob.type }), nm)); imgs++;
         } catch (e) { console.warn(e); }
       }
     }
@@ -1663,7 +1726,7 @@ function planSheet(wb, c, mk, ch, posts, images, blank) {
     return r;
   };
   const addPost = p => {
-    const files = p.media.map(m => m.type === 'image' ? (m.src && !m.src.startsWith('data:') ? new URL(m.src, location.origin).href : '') : m.url).filter(Boolean);
+    const files = p.media.map(m => { const s = m.orig || m.src; return m.type === 'image' ? (s && !s.startsWith('data:') ? new URL(s, location.origin).href : '') : m.url; }).filter(Boolean);
     const r = addRow([p.date ? xDate(p.date) : (p.week ? XLS_UNDATED : 'REZERWA'), p.format, p.pillar, p.title, p.brief, li ? p.copyLi : p.copyMeta, p.cta, p.mentions, p.hashtags,
       p.materialBrief, files.join('\n'), p.time, p.onGraphic, p.toConfirm, APPROVAL[p.approval]?.label || '',
       p.comments.filter(x => x.role === 'client').map(x => `[${x.author}] ${x.text}`).join('\n\n'),
@@ -1792,7 +1855,7 @@ document.addEventListener('click', async e => {
     case 'user-toggle': toggleUser(+id); break;
     case 'user-reset': resetUser(+id); break;
     case 'password-save': savePassword(); break;
-    case 'pub-date': break;
+    case 'pub-date': case 'dl': break;
     case 'toggle-pub': {
       e.stopPropagation();
       const p = state.posts.find(x => x.id === id); p.published = !p.published; p.publishedAt = p.published ? TODAY : '';

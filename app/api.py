@@ -6,10 +6,13 @@ serwer odrzuca starszą wersję i odsyła aktualną, zamiast po cichu ją nadpis
 """
 from __future__ import annotations
 
+import io
 import json
 import re
 import secrets
 import time
+import zipfile
+from urllib.parse import quote
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -230,13 +233,53 @@ async def upload_media(file: UploadFile = File(...), name: str = Form(""),
     return {"id": m.id, "url": f"/media/{m.id}"}
 
 
+EXT = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif"}
+MAX_ZIP_FILES = 30
+MAX_ZIP_MB = 400
+
+
+def _file_name(n: str, fallback: str) -> str:
+    """Nazwa pliku do pobrania: bez znaków niedozwolonych w Windows/macOS, rozsądnej długości."""
+    n = re.sub(r"[\\/:*?\"<>|\x00-\x1f]+", " ", n or "").strip(" .")
+    n = re.sub(r"\s+", " ", n)[:90].strip()
+    return n or fallback
+
+
+def _attachment(name: str) -> str:
+    ascii_name = name.encode("ascii", "ignore").decode() or "plik"
+    return f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(name)}"
+
+
 @router.get("/media/{media_id}")
-def get_media(media_id: str, db: Session = Depends(get_db)):
+def get_media(media_id: str, dl: int = 0, n: str = "", db: Session = Depends(get_db)):
     m = db.get(Media, _check_id(media_id))
     if not m:
         raise HTTPException(404, "Nie ma takiego pliku.")
-    return Response(m.data, media_type=m.content_type,
-                    headers={"Cache-Control": "public, max-age=31536000, immutable"})
+    headers = {"Cache-Control": "public, max-age=31536000, immutable"}
+    if dl:  # pobranie oryginału bez zmian, z czytelną nazwą pliku
+        headers["Content-Disposition"] = _attachment(f"{_file_name(n, 'grafika')}.{EXT.get(m.content_type, 'bin')}")
+    return Response(m.data, media_type=m.content_type, headers=headers)
+
+
+@router.get("/media-zip")
+def media_zip(ids: str, n: str = "", db: Session = Depends(get_db)):
+    """Wszystkie grafiki treści (np. karuzeli) w jednym pliku ZIP, w kolejności slajdów, bez ponownej kompresji."""
+    id_list = [_check_id(i) for i in ids.split(",") if i][:MAX_ZIP_FILES]
+    if not id_list:
+        raise HTTPException(400, "Brak plików.")
+    rows = {m.id: m for m in db.scalars(select(Media).where(Media.id.in_(id_list)))}
+    files = [rows[i] for i in id_list if i in rows]
+    if not files:
+        raise HTTPException(404, "Nie ma takich plików.")
+    if sum(m.size or len(m.data) for m in files) > MAX_ZIP_MB * 1024 * 1024:
+        raise HTTPException(413, "Za dużo danych naraz – pobierz grafiki pojedynczo.")
+    base = _file_name(n, "grafiki")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as z:
+        for i, m in enumerate(files, 1):
+            z.writestr(f"{base} {i:02d}.{EXT.get(m.content_type, 'bin')}", m.data)
+    return Response(buf.getvalue(), media_type="application/zip",
+                    headers={"Content-Disposition": _attachment(f"{base}.zip"), "Cache-Control": "no-store"})
 
 
 # ---------- grafiki (projekty w systemie identyfikacji marki) ----------
