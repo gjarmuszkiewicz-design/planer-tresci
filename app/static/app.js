@@ -189,11 +189,14 @@ async function flush() {
 async function reload(force) {
   // nie podmieniamy ekranu pod kimś, kto właśnie pisze albo ma otwarte okno
   // w module Grafiki odświeżenie przebudowałoby edytor razem z podglądem
-  if (!force && (drawer || modalOpen || lb || route().name === 'studio' || document.activeElement?.matches('input,textarea,select'))) return;
+  const zajety = () => !force && (drawer || modalOpen || lb || busyImport || route().name === 'studio' || document.activeElement?.matches('input,textarea,select'));
+  if (zajety()) return;
   if (PORTAL_TOKEN) { applyServerState(await api('GET', `/api/p/${PORTAL_TOKEN}`)); render(); return; }
   await flush();
   if (pendingChanges()) return;
   const s = await api('GET', '/api/state');
+  // w czasie pobierania mogło się zacząć coś długiego (np. import paczki) – wtedy nie podmieniamy obiektów pod nim
+  if (zajety() || pendingChanges()) return;
   me = s.user; notifs = s.notifications || notifs; applyServerState(s); snapshotAll(); render();
 }
 window.addEventListener('beforeunload', e => { if (!PORTAL_TOKEN && pendingChanges()) { flush(); e.preventDefault(); e.returnValue = ''; } });
@@ -232,7 +235,7 @@ const aiUi = (...a) => typeof aiBtn === 'function' ? aiBtn(...a) : '';
 /* ================= ui state ================= */
 const ui = { month: TODAY.slice(0, 7), ch: 'all', st: 'all', q: '', full: false, portalFilter: 'all', portalView: 'list' };
 let drawer = null;
-let modalOpen = false;
+let modalOpen = false, busyImport = false;
 let imp = null;  // excel import state
 
 /* ================= router ================= */
@@ -595,9 +598,15 @@ async function pobierzSystem(c) {
   for (const [sc, u] of Object.entries(paczka)) zip.file(sc, await (await fetch(u)).blob());
   pobierz(await zip.generateAsync({ type: 'blob' }), plik?.endsWith('.zip') ? plik : 'system-social.zip');
 }
-async function uploadSystem(c) {
+async function uploadSystem(c0) {
   const [f] = await pickFiles('.zip,.json,application/zip,application/json', false); if (!f) return;
-  if (/\.zip$/i.test(f.name) || /zip/.test(f.type)) { try { await importPaczki(c, f); } catch (e) { closeModal(); toast(e.message, 8000); } return; }
+  // po zamknięciu okna wyboru pliku odświeżenie z serwera mogło podmienić obiekty klientów – bierzemy aktualny
+  const c = clientById(c0.id) || c0;
+  if (/\.zip$/i.test(f.name) || /zip/.test(f.type)) {
+    busyImport = true;
+    try { await importPaczki(c, f); } catch (e) { closeModal(); toast(e.message, 8000); } finally { busyImport = false; }
+    return;
+  }
   try {
     if (f.size > 3e6) throw new Error('Plik jest za duży (maks. 3 MB).');
     let raw; try { raw = JSON.parse(await f.text()); } catch { throw new Error('To nie jest poprawny plik JSON.'); }
