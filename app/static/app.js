@@ -191,7 +191,7 @@ async function flush() {
 async function reload(force) {
   // nie podmieniamy ekranu pod kimś, kto właśnie pisze albo ma otwarte okno
   // w module Grafiki odświeżenie przebudowałoby edytor razem z podglądem
-  const zajety = () => !force && (drawer || modalOpen || lb || busyImport || route().name === 'studio' || document.activeElement?.matches('input,textarea,select'));
+  const zajety = () => !force && (drawer || modalOpen || lb || busyImport || route().name === 'studio' || route().tab === 'identyfikacja' || document.activeElement?.matches('input,textarea,select'));
   if (zajety()) return;
   if (PORTAL_TOKEN) { applyServerState(await api('GET', `/api/p/${PORTAL_TOKEN}`)); render(); return; }
   await flush();
@@ -634,16 +634,26 @@ document.addEventListener('click', e => {
 });
 
 /* ================= client views ================= */
+// dokument PDF z kompletną identyfikacją (z paczki systemu) – podgląd tylko w koncie klienta
+const identityPdf = c => /^\/media\/[A-Za-z0-9_-]{4,40}$/.test(c.system?.dokument || '') ? c.system.dokument : '';
+function viewIdentity(c) {
+  const u = identityPdf(c), n = `System identyfikacji ${c.system?.marka?.nazwa || c.name}`;
+  return `<div class="card pdf-card"><div class="card-h"><h3>${esc(n)}</h3><span class="small muted">· kompletna identyfikacja wizualna marki</span><span class="grow"></span>
+      <a class="btn sm" href="${esc(u)}" target="_blank" rel="noopener">Otwórz w nowej karcie</a>
+      <a class="btn sm" href="${esc(u)}?dl=1&n=${encodeURIComponent(n)}">⤓ Pobierz PDF</a></div>
+    <iframe class="pdf-view" src="${esc(u)}#view=FitH" title="${esc(n)}"></iframe></div>`;
+}
 function viewClient(c, tab) {
-  const brand = clientBrand(c);
-  const tabs = [['plan', 'Plan (tabela)'], ['kalendarz', 'Kalendarz'], ...(brand ? [['grafiki', 'Grafiki']] : []), ['profil', 'Profil, filary i ustawienia']];
-  if (tab === 'grafiki' && !brand) tab = 'plan';
+  const brand = clientBrand(c), pdf = isClient() && identityPdf(c);
+  const tabs = [['plan', 'Plan (tabela)'], ['kalendarz', 'Kalendarz'], ...(brand ? [['grafiki', 'Grafiki']] : []), ...(pdf ? [['identyfikacja', 'Identyfikacja (PDF)']] : []), ['profil', 'Profil, filary i ustawienia']];
+  if ((tab === 'grafiki' && !brand) || (tab === 'identyfikacja' && !pdf)) tab = 'plan';
   let content;
-  if (tab === 'kalendarz') content = viewCalendar(c);
+  if (tab === 'identyfikacja') content = viewIdentity(c);
+  else if (tab === 'kalendarz') content = viewCalendar(c);
   else if (tab === 'grafiki') content = viewStudio({ did: '' }, c);
   else if (tab === 'profil') content = viewProfile(c);
   else content = viewTable(c);
-  return `<div class="container ${(tab === 'plan' && ui.full) || tab === 'grafiki' ? 'wide' : ''}">
+  return `<div class="container ${(tab === 'plan' && ui.full) || tab === 'grafiki' || tab === 'identyfikacja' ? 'wide' : ''}">
     <div class="topbar">${avatar(c, 44)}<div><h1>${esc(c.name)}</h1>
       <div class="muted small row" style="gap:12px"><span class="ch">${ICON.ig}${ICON.fb} ${esc(c.igHandle ? '@' + c.igHandle : '—')}</span><span class="ch">${ICON.li} ${esc(c.liName || '—')}</span></div></div>
       <div class="grow"></div>

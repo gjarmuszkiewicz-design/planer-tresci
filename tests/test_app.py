@@ -157,6 +157,9 @@ def test_media_pdf_for_brand_document(client):
     assert r.status_code == 200
     got = TestClient(app).get(r.json()["url"] if "url" in r.json() else f"/media/{r.json()['id']}")
     assert got.status_code == 200 and got.content == pdf and got.headers["content-type"] == "application/pdf"
+    # podgląd PDF w ramce panelu: tylko z naszej strony, reszta aplikacji nadal bez ramek
+    assert got.headers["x-frame-options"] == "SAMEORIGIN"
+    assert TestClient(app).get("/login").headers["x-frame-options"] == "DENY"
 
 
 def test_media_download_original_and_zip(client):

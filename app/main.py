@@ -51,7 +51,8 @@ async def security(request: Request, call_next):
             return JSONResponse({"detail": "Żądanie z obcej strony."}, status_code=403)
     response = await call_next(request)
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
-    response.headers["X-Frame-Options"] = "DENY"
+    # pliki (np. PDF systemu identyfikacji) można pokazać w ramce, ale tylko w naszym panelu
+    response.headers["X-Frame-Options"] = "SAMEORIGIN" if request.url.path.startswith("/media/") else "DENY"
     response.headers["Referrer-Policy"] = "same-origin"
     response.headers["X-Content-Type-Options"] = "nosniff"
     return response
