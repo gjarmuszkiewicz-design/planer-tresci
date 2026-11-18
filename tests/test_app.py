@@ -378,6 +378,82 @@ def test_change_password(client):
     assert login(fresh, password="nowe-haslo-12").status_code == 303
 
 
+def test_client_account_sees_only_own_client(client):
+    # drugi klient agencji z treścią i grafiką – konto Kawiarni nie może go zobaczyć ani zmienić
+    other = {"clients": [{"id": "klient02", "token": "b" * 24, "name": "Piekarnia", "notes": "inne"}],
+             "posts": [{"id": "post9001", "clientId": "klient02", "date": "2026-10-08", "title": "Cudzy post", "approval": "pending"}]}
+    assert client.post("/api/sync", json=other).status_code == 200
+    assert client.put("/api/designs/dsgn9001", json={"brand": "k-klient02", "data": {"name": "cudza"}}).status_code == 200
+    assert client.post("/api/users", json={"email": "k@kawiarnia.pl", "password": "haslo-klienta", "role": "client"}).status_code == 400
+    r = client.post("/api/users", json={"email": "k@kawiarnia.pl", "name": "Kasia z Kawiarni", "password": "haslo-klienta",
+                                        "role": "client", "clientId": "klient01"})
+    assert r.status_code == 200 and r.json()["role"] == "client" and r.json()["clientId"] == "klient01"
+    assert any(u.get("clientId") == "klient01" for u in client.get("/api/users").json())
+
+    k = TestClient(app)
+    assert login(k, "k@kawiarnia.pl", "haslo-klienta").status_code == 303
+    s = k.get("/api/state").json()
+    assert s["user"]["clientId"] == "klient01" and s["notifications"]["items"] == []
+    assert [c["id"] for c in s["clients"]] == ["klient01"]
+    assert {p["clientId"] for p in s["posts"]} == {"klient01"}
+    raw = json.dumps(s)
+    assert "TAJNE" not in raw and "notatka wewnętrzna" not in raw and TOKEN not in raw and "Cudzy" not in raw
+
+    # cudze dane: zapis, usuwanie, komentarz i grafiki są zablokowane
+    assert k.post("/api/sync", json={"posts": [{"id": "post9001", "clientId": "klient02", "rev": 1, "title": "x"}]}).status_code == 403
+    assert k.post("/api/sync", json={"posts": [{"id": "post9001", "clientId": "klient01", "rev": 1, "title": "x"}]}).status_code == 403
+    assert k.post("/api/sync", json={"deletePosts": ["post9001"]}).status_code == 403
+    assert k.post("/api/sync", json={"deleteClients": ["klient01"]}).status_code == 403
+    assert k.post("/api/sync", json={"clients": [{"id": "nowy0001", "name": "Nowy"}]}).status_code == 403
+    assert k.post("/api/posts/post9001/comments", json={"text": "hej"}).status_code == 404
+    assert {d["brand"] for d in k.get("/api/designs").json()} <= {"k-klient01"}
+    assert "dsgn9001" not in {d["id"] for d in k.get("/api/designs").json()}
+    assert k.put("/api/designs/dsgn9001", json={"brand": "k-klient01", "data": {}}).status_code == 403
+    assert k.delete("/api/designs/dsgn9001").status_code == 403
+    assert k.put("/api/designs/dsgn9002", json={"brand": "k-klient01", "data": {"name": "moja"}}).status_code == 200
+    assert k.get("/api/users").status_code == 403
+    assert k.get("/api/ai/status").json()["enabled"] is False
+    assert k.post("/api/ai/write", json={"clientId": "klient01", "postId": "post0001"}).status_code == 403
+
+    # własny profil: zapis działa, ale notatki, linki i ustawienia Grafiki agencji zostają nietknięte
+    assert client.post("/api/sync", json={"clients": [{**{c["id"]: c for c in client.get("/api/state").json()["clients"]}["klient01"],
+                                                       "notes": "TAJNE notatki agencji", "links": [{"name": "TAJNE wyceny", "url": "https://example.com"}]}]}).status_code == 200
+    assert k.post("/api/sync", json={"clients": [{"id": "klient01", "name": "Kawiarnia Nowa", "notes": "nadpisane", "brand": "none", "token": "c" * 24}]}).status_code == 200
+    agency = {c["id"]: c for c in client.get("/api/state").json()["clients"]}["klient01"]
+    assert agency["name"] == "Kawiarnia Nowa" and agency["notes"] == "TAJNE notatki agencji" and agency["token"] == TOKEN
+    assert agency["links"][0]["name"] == "TAJNE wyceny"
+
+    # własna treść: edycja zachowuje notatkę agencji, akceptacja i komentarz trafiają pod dzwonek agencji
+    ap = next(x for x in client.get("/api/state").json()["posts"] if x["id"] == "post0001")
+    assert client.post("/api/sync", json={"posts": [{**ap, "note": "notatka wewnętrzna", "approval": "pending"}]}).status_code == 200
+    p = next(x for x in k.get("/api/state").json()["posts"] if x["id"] == "post0001")
+    assert "note" not in p and p["unread"] is False
+    r = k.post("/api/sync", json={"posts": [{**p, "approval": "accepted", "note": "", "title": "Zaakceptowany przez klienta"}]})
+    assert r.status_code == 200 and r.json()["revs"]["post0001"] == p["rev"] + 1
+    assert k.post("/api/posts/post0001/comments", json={"text": "Super!"}).json()["role"] == "client"
+    new = k.post("/api/sync", json={"posts": [{"id": "post0003", "clientId": "klient01", "date": "2026-10-09", "title": "Od klienta", "approval": "draft"}]})
+    assert new.status_code == 200
+    ag = client.get("/api/state").json()
+    ap = next(x for x in ag["posts"] if x["id"] == "post0001")
+    assert ap["note"] == "notatka wewnętrzna" and ap["approval"] == "accepted" and ap["unread"] is True
+    kinds = [(n["kind"], n["author"]) for n in ag["notifications"]["items"][:2]]
+    assert ("comment", "Kasia z Kawiarni") in kinds and ("accept", "Kasia z Kawiarni") in kinds
+
+    # usunięcie innego klienta nie rusza konta; konto bez klienta nie widzi niczego
+    assert k.get("/api/state").status_code == 200
+    from app.db import SessionLocal
+    from app.models import ClientAccess
+    with SessionLocal() as db:
+        db.delete(db.get(ClientAccess, s["user"]["id"]))
+        db.commit()
+    assert k.get("/api/state").status_code == 403
+    assert k.post("/api/sync", json={"posts": []}).status_code == 403
+    with SessionLocal() as db:
+        db.add(ClientAccess(user_id=s["user"]["id"], client_id="klient01"))
+        db.commit()
+    assert client.post("/api/sync", json={"deleteClients": ["klient02"]}).status_code == 200
+
+
 def test_delete_client_cascades(client):
     r = client.post("/api/sync", json={"deleteClients": ["klient01"]})
     assert r.status_code == 200

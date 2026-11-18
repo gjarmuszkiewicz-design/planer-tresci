@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .auth import current_user
+from .auth import current_user, require_team
 from .db import get_db
 from .models import Client, MonthPlan, Post, User
 
@@ -154,8 +154,9 @@ def _post_line(p: dict) -> str:
 # ---------------------------------------------------------------- status
 
 @router.get("/api/ai/status")
-def status(_user: User = Depends(current_user)):
-    return {"enabled": enabled(), "model": MODEL}
+def status(user: User = Depends(current_user)):
+    # asystent AI (na koszt agencji) jest tylko dla zespołu, nie dla kont klientów
+    return {"enabled": enabled() and user.role != "client", "model": MODEL}
 
 
 # ---------------------------------------------------------------- plan miesiąca
@@ -215,7 +216,7 @@ def _calendar(month: str) -> tuple[list[str], str]:
 
 
 @router.post("/api/ai/plan")
-def plan(body: PlanBody, _user: User = Depends(current_user), db: Session = Depends(get_db)):
+def plan(body: PlanBody, _user: User = Depends(require_team), db: Session = Depends(get_db)):
     if not MONTH_RE.match(body.month):
         raise HTTPException(400, "Nieprawidłowy miesiąc.")
     if not (body.meta or body.li):
@@ -289,7 +290,7 @@ WRITE_SCHEMA = _obj({k: STR for k in WRITE_FIELDS})
 
 
 @router.post("/api/ai/write")
-def write(body: WriteBody, _user: User = Depends(current_user), db: Session = Depends(get_db)):
+def write(body: WriteBody, _user: User = Depends(require_team), db: Session = Depends(get_db)):
     c = _client_row(db, body.clientId)
     p = {k: body.post.get(k) for k in ("date", "week", "month", "meta", "li", "format", "pillar", *WRITE_FIELDS)}
     if len(json.dumps(p, ensure_ascii=False)) > 30000:
@@ -325,7 +326,7 @@ STRATEGY_SCHEMA = _obj({
 
 
 @router.post("/api/ai/strategy")
-async def strategy_from_pdf(file: UploadFile = File(...), _user: User = Depends(current_user)):
+async def strategy_from_pdf(file: UploadFile = File(...), _user: User = Depends(require_team)):
     raw = await file.read(MAX_PDF_MB * 1024 * 1024 + 1)
     if len(raw) > MAX_PDF_MB * 1024 * 1024:
         raise HTTPException(400, f"Plik jest za duży (maks. {MAX_PDF_MB} MB).")

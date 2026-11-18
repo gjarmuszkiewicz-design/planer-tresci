@@ -11,7 +11,9 @@ import json
 import re
 import secrets
 import time
+import unicodedata
 import zipfile
+from pathlib import Path
 from urllib.parse import quote
 from typing import Any
 
@@ -21,10 +23,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .auth import current_user, hash_password, require_admin, user_json, validate_password, verify_password
+from .auth import client_scope, current_user, hash_password, require_admin, user_json, validate_password, verify_password
 from .config import settings
 from .db import get_db
-from .models import Client, Comment, Design, Media, MonthPlan, Notification, NotificationSeen, Post, User
+from .models import Client, ClientAccess, Comment, Design, Media, MonthPlan, Notification, NotificationSeen, Post, User
 
 router = APIRouter()
 
@@ -45,11 +47,26 @@ def comment_json(c: Comment) -> dict:
     return {"id": c.id, "role": c.role, "author": c.author, "text": c.text, "at": c.at}
 
 
-def post_json(p: Post, comments: list[Comment]) -> dict:
-    return {**p.data, "id": p.id, "clientId": p.client_id, "rev": p.rev, "comments": [comment_json(c) for c in comments]}
+# Konto klienta (rola client) pracuje w swoim profilu jak zespół, ale bez rzeczy wewnętrznych agencji:
+# tych pól klienta nie dostaje w odpowiedzi API, a przy zapisie serwer zostawia ich obecną wartość.
+CLIENT_HIDDEN_FIELDS = ("notes", "links", "drive", "strategyDoc")
+# ustawienia modułu Grafiki konto klienta widzi (żeby działały Grafiki), ale nie może ich zmienić
+CLIENT_LOCKED_FIELDS = CLIENT_HIDDEN_FIELDS + ("brand", "system")
+# pola treści tylko dla agencji: notatka wewnętrzna i czerwona kropka „nowe od klienta”
+CLIENT_HIDDEN_POST_FIELDS = ("note", "unread")
 
 
-def client_json(c: Client) -> dict:
+def post_json(p: Post, comments: list[Comment], scoped: bool = False) -> dict:
+    data = {k: v for k, v in p.data.items() if k not in CLIENT_HIDDEN_POST_FIELDS} if scoped else p.data
+    out = {**data, "id": p.id, "clientId": p.client_id, "rev": p.rev, "comments": [comment_json(c) for c in comments]}
+    if scoped:
+        out["unread"] = False
+    return out
+
+
+def client_json(c: Client, scoped: bool = False) -> dict:
+    if scoped:
+        return {**{k: v for k, v in c.data.items() if k not in CLIENT_HIDDEN_FIELDS}, "id": c.id}
     return {**c.data, "id": c.id, "token": c.token}
 
 
@@ -62,20 +79,23 @@ def comments_by_post(db: Session, post_ids: list[str]) -> dict[str, list[Comment
 
 
 @router.get("/api/me")
-def me(user: User = Depends(current_user)):
-    return user_json(user)
+def me(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    return user_json(user, client_scope(db, user))
 
 
 @router.get("/api/state")
 def state(user: User = Depends(current_user), db: Session = Depends(get_db)):
-    clients = db.scalars(select(Client)).all()
-    posts = db.scalars(select(Post)).all()
+    scope = client_scope(db, user)
+    qc, qp, qm = select(Client), select(Post), select(MonthPlan)
+    if scope is not None:
+        qc, qp, qm = qc.where(Client.id == scope), qp.where(Post.client_id == scope), qm.where(MonthPlan.client_id == scope)
+    clients, posts, months = db.scalars(qc).all(), db.scalars(qp).all(), db.scalars(qm).all()
     cm = comments_by_post(db, [p.id for p in posts])
-    months = db.scalars(select(MonthPlan)).all()
+    scoped = scope is not None
     return {
-        "user": user_json(user),
-        "clients": [client_json(c) for c in clients],
-        "posts": [post_json(p, cm[p.id]) for p in posts],
+        "user": user_json(user, scope),
+        "clients": [client_json(c, scoped) for c in clients],
+        "posts": [post_json(p, cm[p.id], scoped) for p in posts],
         "months": [{**m.data, "clientId": m.client_id, "month": m.month} for m in months],
         "notifications": notifications_for(db, user),
     }
@@ -87,6 +107,8 @@ NOTIF_LIMIT = 50
 
 
 def notifications_for(db: Session, user: User) -> dict:
+    if user.role == "client":  # dzwonek to zdarzenia od klientów dla agencji
+        return {"unread": 0, "seenAt": 0, "items": []}
     seen = db.get(NotificationSeen, user.id)
     seen_at = seen.seen_at if seen else 0
     rows = db.scalars(select(Notification).order_by(Notification.at.desc()).limit(NOTIF_LIMIT)).all()
@@ -126,12 +148,27 @@ class SyncBody(BaseModel):
 
 
 @router.post("/api/sync")
-def sync(body: SyncBody, _user: User = Depends(current_user), db: Session = Depends(get_db)):
+def sync(body: SyncBody, user: User = Depends(current_user), db: Session = Depends(get_db)):
     revs: dict[str, int] = {}
     conflicts: list[Post] = []
+    scope = client_scope(db, user)
+
+    def own(cid: str) -> str:
+        if scope is not None and cid != scope:
+            raise HTTPException(403, "To konto ma dostęp tylko do swojego klienta.")
+        return cid
+
+    if scope is not None and body.deleteClients:
+        raise HTTPException(403, "Konto klienta nie może usuwać klientów.")
 
     for c in body.clients:
-        cid = _check_id(c.get("id"), "identyfikator klienta")
+        cid = own(_check_id(c.get("id"), "identyfikator klienta"))
+        if scope is not None:
+            row = db.get(Client, cid)
+            data = {k: v for k, v in c.items() if k not in ("id", "token") + CLIENT_LOCKED_FIELDS}
+            data.update({k: row.data[k] for k in CLIENT_LOCKED_FIELDS if k in row.data})
+            row.data = data
+            continue
         token = c.get("token") or secrets.token_hex(12)
         if not TOKEN_RE.match(token):
             raise HTTPException(400, "Niepoprawny token linku klienta.")
@@ -147,7 +184,7 @@ def sync(body: SyncBody, _user: User = Depends(current_user), db: Session = Depe
     db.flush()
 
     for m in body.months:
-        cid, month = _check_id(m.get("clientId"), "identyfikator klienta"), m.get("month", "")
+        cid, month = own(_check_id(m.get("clientId"), "identyfikator klienta")), m.get("month", "")
         if not MONTH_RE.match(month):
             raise HTTPException(400, "Niepoprawny miesiąc.")
         if not db.get(Client, cid):
@@ -161,12 +198,28 @@ def sync(body: SyncBody, _user: User = Depends(current_user), db: Session = Depe
 
     for p in body.posts:
         pid = _check_id(p.get("id"), "identyfikator treści")
-        cid = _check_id(p.get("clientId"), "identyfikator klienta")
+        cid = own(_check_id(p.get("clientId"), "identyfikator klienta"))
         if not db.get(Client, cid):
             raise HTTPException(400, "Treść dla nieistniejącego klienta.")
         data = {k: v for k, v in p.items() if k not in ("id", "clientId", "rev", "comments")}
         month = (data.get("date") or data.get("month") or "")[:7]
         row = db.get(Post, pid)
+        if scope is not None:
+            if row is not None and row.client_id != scope:
+                raise HTTPException(403, "To konto ma dostęp tylko do swojego klienta.")
+            for k in CLIENT_HIDDEN_POST_FIELDS:
+                data.pop(k, None)
+                if row is not None and k in row.data:
+                    data[k] = row.data[k]
+            # akceptacja albo prośba o zmiany z konta klienta trafia do agencji jak z linku dla klienta
+            old, new = (row.data.get("approval") if row else None), data.get("approval")
+            if row is not None and int(p.get("rev") or 0) == row.rev and new != old and new in ("accepted", "changes"):
+                now, author = int(time.time() * 1000), user.name or user.email
+                db.add(Comment(id=secrets.token_hex(8), post_id=pid, role="sys", author=author,
+                               text="Zaakceptowano" if new == "accepted" else "Poproszono o zmiany", at=now))
+                db.add(Notification(client_id=cid, post_id=pid, kind="accept" if new == "accepted" else "changes",
+                                    author=author, text="", at=now))
+                data["unread"] = True
         if row is None:
             db.add(Post(id=pid, client_id=cid, month=month, data=data, rev=1))
             revs[pid] = 1
@@ -179,9 +232,10 @@ def sync(body: SyncBody, _user: User = Depends(current_user), db: Session = Depe
     for pid in body.deletePosts:
         row = db.get(Post, _check_id(pid))
         if row:
+            own(row.client_id)
             db.delete(row)
     for m in body.deleteMonths:
-        row = db.get(MonthPlan, (m.get("clientId", ""), m.get("month", "")))
+        row = db.get(MonthPlan, (own(m.get("clientId", "")), m.get("month", "")))
         if row:
             db.delete(row)
     db.flush()
@@ -192,12 +246,14 @@ def sync(body: SyncBody, _user: User = Depends(current_user), db: Session = Depe
                 db.delete(p)
             for m in db.scalars(select(MonthPlan).where(MonthPlan.client_id == row.id)):
                 db.delete(m)
+            for a in db.scalars(select(ClientAccess).where(ClientAccess.client_id == row.id)):
+                db.delete(a)
             db.flush()
             db.delete(row)
 
     db.commit()
     cm = comments_by_post(db, [p.id for p in conflicts])
-    return {"revs": revs, "conflicts": [post_json(p, cm[p.id]) for p in conflicts]}
+    return {"revs": revs, "conflicts": [post_json(p, cm[p.id], scope is not None) for p in conflicts]}
 
 
 class CommentBody(BaseModel):
@@ -208,13 +264,17 @@ class CommentBody(BaseModel):
 def add_comment(post_id: str, body: CommentBody, user: User = Depends(current_user), db: Session = Depends(get_db)):
     post = db.get(Post, _check_id(post_id))
     text = body.text.strip()
-    if not post:
+    scope = client_scope(db, user)
+    if not post or (scope is not None and post.client_id != scope):
         raise HTTPException(404, "Najpierw zapisz treść.")
     if not text:
         raise HTTPException(400, "Komentarz jest pusty.")
-    c = Comment(id=secrets.token_hex(8), post_id=post.id, role="agency", author=user.name or user.email,
-                text=text[:5000], at=int(time.time() * 1000))
+    author, now = user.name or user.email, int(time.time() * 1000)
+    c = Comment(id=secrets.token_hex(8), post_id=post.id, role="client" if scope else "agency", author=author,
+                text=text[:5000], at=now)
     db.add(c)
+    if scope:  # komentarz z konta klienta – powiadomienie pod dzwonkiem agencji
+        db.add(Notification(client_id=post.client_id, post_id=post.id, kind="comment", author=author, text=text[:5000], at=now))
     db.commit()
     return comment_json(c)
 
@@ -297,20 +357,55 @@ def design_json(d: Design) -> dict:
     return {**d.data, "id": d.id, "brand": d.brand, "updatedAt": int(d.updated_at.timestamp() * 1000)}
 
 
+MARKI_JSON = Path(__file__).parent / "marki" / "marki.json"
+
+
+def _pkey(s: str) -> str:
+    """Jak pkey() w app.js: wielkie litery bez polskich znaków i odstępów."""
+    s = unicodedata.normalize("NFD", str(s or "").upper().replace("Ł", "L"))
+    return re.sub(r"[^A-Z0-9]", "", "".join(ch for ch in s if not unicodedata.combining(ch)))
+
+
+def brands_for(db: Session, user: User) -> set[str] | None:
+    """Marki projektów, które widzi konto klienta: jego system z pliku i wbudowany system jego marki (po nazwie)."""
+    scope = client_scope(db, user)
+    if scope is None:
+        return None
+    c = db.get(Client, scope)
+    out = {f"k-{scope}"}
+    try:
+        name = _pkey(c.data.get("name"))
+        out |= {b["id"] for b in json.loads(MARKI_JSON.read_text(encoding="utf-8")) if _pkey(b.get("nazwa")) and _pkey(b.get("nazwa")) in name}
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    return out
+
+
+def _own_design(allowed: set[str] | None, brand: str) -> None:
+    if allowed is not None and brand not in allowed:
+        raise HTTPException(403, "To konto ma dostęp tylko do grafik swojego klienta.")
+
+
 @router.get("/api/designs")
-def list_designs(_user: User = Depends(current_user), db: Session = Depends(get_db)):
-    return [design_json(d) for d in db.scalars(select(Design).order_by(Design.updated_at.desc()))]
+def list_designs(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    allowed, q = brands_for(db, user), select(Design).order_by(Design.updated_at.desc())
+    if allowed is not None:
+        q = q.where(Design.brand.in_(allowed))
+    return [design_json(d) for d in db.scalars(q)]
 
 
 @router.put("/api/designs/{design_id}")
-def save_design(design_id: str, body: DesignBody, _user: User = Depends(current_user), db: Session = Depends(get_db)):
+def save_design(design_id: str, body: DesignBody, user: User = Depends(current_user), db: Session = Depends(get_db)):
     if not BRAND_RE.match(body.brand):
         raise HTTPException(400, "Niepoprawna marka.")
+    allowed = brands_for(db, user)
+    _own_design(allowed, body.brand)
     if len(json.dumps(body.data)) > 200_000:
         raise HTTPException(413, "Projekt jest za duży.")
     data = {k: v for k, v in body.data.items() if k not in ("id", "brand", "updatedAt")}
     d = db.get(Design, _check_id(design_id))
     if d:
+        _own_design(allowed, d.brand)
         d.brand, d.data = body.brand, data
     else:
         d = Design(id=design_id, brand=body.brand, data=data)
@@ -321,9 +416,10 @@ def save_design(design_id: str, body: DesignBody, _user: User = Depends(current_
 
 
 @router.delete("/api/designs/{design_id}")
-def delete_design(design_id: str, _user: User = Depends(current_user), db: Session = Depends(get_db)):
+def delete_design(design_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
     d = db.get(Design, _check_id(design_id))
     if d:
+        _own_design(brands_for(db, user), d.brand)
         db.delete(d)
         db.commit()
     return {"ok": True}
@@ -336,6 +432,7 @@ class NewUser(BaseModel):
     name: str = ""
     password: str
     role: str = "member"
+    clientId: str = ""  # dla roli client: jedyny klient, którego to konto widzi
 
 
 class UserPatch(BaseModel):
@@ -352,7 +449,8 @@ class PasswordChange(BaseModel):
 
 @router.get("/api/users")
 def list_users(_admin: User = Depends(require_admin), db: Session = Depends(get_db)):
-    return [user_json(u) for u in db.scalars(select(User).order_by(User.name))]
+    access = {a.user_id: a.client_id for a in db.scalars(select(ClientAccess))}
+    return [user_json(u, access.get(u.id)) for u in db.scalars(select(User).order_by(User.name))]
 
 
 @router.post("/api/users")
@@ -363,11 +461,16 @@ def create_user(body: NewUser, _admin: User = Depends(require_admin), db: Sessio
     if db.scalar(select(User).where(User.email == email)):
         raise HTTPException(409, "Konto z tym adresem już istnieje.")
     validate_password(body.password)
-    u = User(email=email, name=body.name.strip() or email, role="admin" if body.role == "admin" else "member",
-             password_hash=hash_password(body.password))
+    role = body.role if body.role in ("admin", "client") else "member"
+    if role == "client" and not (ID_RE.match(body.clientId or "") and db.get(Client, body.clientId)):
+        raise HTTPException(400, "Wybierz klienta, do którego ma dostęp to konto.")
+    u = User(email=email, name=body.name.strip() or email, role=role, password_hash=hash_password(body.password))
     db.add(u)
+    db.flush()
+    if role == "client":
+        db.add(ClientAccess(user_id=u.id, client_id=body.clientId))
     db.commit()
-    return user_json(u)
+    return user_json(u, body.clientId if role == "client" else None)
 
 
 @router.patch("/api/users/{user_id}")
@@ -379,7 +482,7 @@ def update_user(user_id: int, body: UserPatch, admin: User = Depends(require_adm
         raise HTTPException(400, "Nie możesz odebrać uprawnień ani wyłączyć własnego konta.")
     if body.name is not None:
         u.name = body.name.strip() or u.email
-    if body.role in ("admin", "member"):
+    if body.role in ("admin", "member") and u.role != "client":  # konto klienta zostaje kontem klienta
         u.role = body.role
     if body.active is not None:
         u.active = body.active
@@ -387,7 +490,8 @@ def update_user(user_id: int, body: UserPatch, admin: User = Depends(require_adm
         validate_password(body.password)
         u.password_hash = hash_password(body.password)
     db.commit()
-    return user_json(u)
+    acc = db.get(ClientAccess, u.id)
+    return user_json(u, acc.client_id if acc else None)
 
 
 @router.post("/api/me/password")

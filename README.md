@@ -38,6 +38,7 @@ nagłówek) to dane z planera: GODZINA, TEKST NA GRAFICE, DO POTWIERDZENIA, STAT
 dacie i temacie) stają się jedną treścią na obu kanałach. W kolumnie DATA zamiast daty można wpisać „W TYGODNIU”
 (dzień do ustalenia) albo „REZERWA”.
 | **Zespół** | Konta osób z agencji (administrator dodaje osoby, ustawia hasła, wyłącza konta) |
+| **Konta klientów** | W oknie **Zespół** administrator wybiera rolę „Konto klienta” i klienta. Takie konto loguje się w tym samym panelu i widzi tylko swoją firmę: plan, kalendarz, profil, filary i Grafiki. Może tworzyć i edytować treści oraz sam je akceptować. Akceptacje, prośby o zmiany i komentarze z konta klienta trafiają pod dzwonek agencji. Serwer nie wysyła mu notatek wewnętrznych (klienta i treści), linków zespołu, pełnej strategii dla AI ani linku klienta. Konto nie może zmienić ustawień modułu Grafiki, usunąć firmy ani używać asystenta AI |
 | **Powiadomienia** | Dzwonek w menu: akceptacje, prośby o zmiany i komentarze klientów, licznik nieprzeczytanych osobno dla każdej osoby, sprawdzanie co 30 s, kliknięcie otwiera treść |
 
 Zmiany zapisują się same (stan widać na dole menu: „✓ Zapisano”). Jeśli klient zaakceptuje treść, gdy ktoś z zespołu

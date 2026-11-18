@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from .config import settings
 from .db import SessionLocal, get_db
-from .models import User
+from .models import ClientAccess, Client, User
 
 log = logging.getLogger(__name__)
 
@@ -94,5 +94,25 @@ def require_admin(user: User = Depends(current_user)) -> User:
     return user
 
 
-def user_json(u: User) -> dict:
-    return {"id": u.id, "email": u.email, "name": u.name, "role": u.role, "active": u.active}
+def require_team(user: User = Depends(current_user)) -> User:
+    """Tylko zespół agencji (nie konto klienta)."""
+    if user.role == "client":
+        raise HTTPException(403, "Ta funkcja jest dostępna tylko dla zespołu agencji.")
+    return user
+
+
+def client_scope(db: Session, user: User) -> str | None:
+    """None – zespół agencji widzi wszystkich klientów; identyfikator – konto klienta widzi tylko tego klienta."""
+    if user.role != "client":
+        return None
+    acc = db.get(ClientAccess, user.id)
+    if not acc or not db.get(Client, acc.client_id):
+        raise HTTPException(403, "To konto nie ma przypisanego klienta. Skontaktuj się z agencją.")
+    return acc.client_id
+
+
+def user_json(u: User, client_id: str | None = None) -> dict:
+    out = {"id": u.id, "email": u.email, "name": u.name, "role": u.role, "active": u.active}
+    if u.role == "client":
+        out["clientId"] = client_id
+    return out

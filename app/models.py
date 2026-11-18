@@ -25,7 +25,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(200), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(200), default="")
     password_hash: Mapped[str] = mapped_column(String(300))
-    role: Mapped[str] = mapped_column(String(20), default="member")  # admin / member
+    role: Mapped[str] = mapped_column(String(20), default="member")  # admin / member / client
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
@@ -93,6 +93,15 @@ class NotificationSeen(Base):
 
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     seen_at: Mapped[int] = mapped_column(BigInteger, default=0)
+
+
+class ClientAccess(Base):
+    """Konto klienta (rola client) widzi tylko jednego klienta. Osobna tabela, żeby nie zmieniać tabeli users."""
+
+    __tablename__ = "client_access"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), index=True)
 
 
 class Design(Base):

@@ -88,7 +88,9 @@ function toast(msg, ms = 2600) {
 /* ================= server (API) ================= */
 // Panel klienta działa pod /p/<token> (bez logowania), panel agencji pod / (po zalogowaniu).
 const PORTAL_TOKEN = (location.pathname.match(/^\/p\/([a-f0-9]{24,64})\/?$/) || [])[1] || null;
-let me = null;  // zalogowana osoba z zespołu
+let me = null;  // zalogowana osoba z zespołu albo konto klienta
+// konto klienta widzi tylko swój profil, bez rzeczy wewnętrznych agencji (serwer i tak ich nie wysyła)
+const isClient = () => me?.role === 'client';
 let notifs = { unread: 0, items: [], seenAt: 0 };  // powiadomienia od klientów (dzwonek)
 let state = { clients: [], posts: [], months: {} };
 
@@ -259,6 +261,7 @@ function render() {
   if (r.name === 'portal') { $('#app').innerHTML = viewPortal(r.token); return; }
   // stary adres modułu Grafiki prowadzi do zakładki Grafiki klienta z systemem marki
   if (r.name === 'old-studio') { const c = state.clients.find(x => clientBrand(x)); location.replace(c ? `#/k/${c.id}/grafiki` : '#/'); return; }
+  if (isClient() && ((r.name !== 'client' && r.name !== 'studio') || r.id !== me.clientId)) { location.replace(`#/k/${me.clientId}/plan`); return; }
   let body;
   if (r.name === 'client') {
     const c = clientById(r.id);
@@ -281,17 +284,17 @@ function viewSide(r) {
   }).join('');
   return `<aside class="side">
     <div class="brand"><a href="#/" aria-label="Pulpit"><img src="/static/logo-wizme-white.png" alt="WIZme"><span class="app">Planer treści</span></a><span class="grow"></span>
-      <button class="bell" data-act="notif" title="Powiadomienia od klientów">${ICON.bell}${notifs.unread ? `<span class="dot">${notifs.unread > 99 ? '99+' : notifs.unread}</span>` : ''}</button></div>
-    <nav class="nav"><a href="#/" class="${r.name === 'dash' ? 'active' : ''}">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Pulpit</a></nav>
-    <div class="nav-label">Klienci</div>
+      ${isClient() ? '' : `<button class="bell" data-act="notif" title="Powiadomienia od klientów">${ICON.bell}${notifs.unread ? `<span class="dot">${notifs.unread > 99 ? '99+' : notifs.unread}</span>` : ''}</button>`}</div>
+    ${isClient() ? '' : `<nav class="nav"><a href="#/" class="${r.name === 'dash' ? 'active' : ''}">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Pulpit</a></nav>`}
+    <div class="nav-label">${isClient() ? 'Twoja firma' : 'Klienci'}</div>
     <div class="scroll"><nav class="nav">${clients || '<div class="small" style="padding:6px 12px;color:rgba(255,255,255,.5)">Brak klientów</div>'}</nav></div>
     <div class="foot">
-      <button class="hi" data-act="import-xlsx">⤒ Importuj plan z Excela</button>
-      <button data-act="new-client">＋ Dodaj klienta</button>
+      ${isClient() ? '' : `<button class="hi" data-act="import-xlsx">⤒ Importuj plan z Excela</button>
+      <button data-act="new-client">＋ Dodaj klienta</button>`}
       ${me?.role === 'admin' ? '<button data-act="team">👥 Zespół</button>' : ''}
       <div class="me"><span class="av" style="width:34px;height:34px;font-size:14px;background:#5b3fb0">${esc(initials(me?.name))}</span>
-        <span class="who" title="${esc(me?.email)}"><b>${esc(me?.name || '')}</b><span>${me?.role === 'admin' ? 'Administrator' : 'Zespół'}</span></span>
+        <span class="who" title="${esc(me?.email)}"><b>${esc(me?.name || '')}</b><span>${me?.role === 'admin' ? 'Administrator' : isClient() ? 'Konto klienta' : 'Zespół'}</span></span>
         <button data-act="password" title="Zmień hasło">🔑</button><a href="/logout" title="Wyloguj się">⎋</a></div>
       <div id="sync" class="sync" data-kind="ok">✓ Zapisano</div>
     </div>
@@ -644,11 +647,11 @@ function viewClient(c, tab) {
     <div class="topbar">${avatar(c, 44)}<div><h1>${esc(c.name)}</h1>
       <div class="muted small row" style="gap:12px"><span class="ch">${ICON.ig}${ICON.fb} ${esc(c.igHandle ? '@' + c.igHandle : '—')}</span><span class="ch">${ICON.li} ${esc(c.liName || '—')}</span></div></div>
       <div class="grow"></div>
-      <button class="btn" data-act="share" data-id="${c.id}">🔗 Link dla klienta</button>
+      ${isClient() ? '' : `<button class="btn" data-act="share" data-id="${c.id}">🔗 Link dla klienta</button>`}
       ${aiUi(`data-ai="plan-open" data-client="${c.id}"`, 'Zaplanuj z AI')}
       ${brand ? `<button class="btn" data-sa="new-top" data-client="${c.id}">＋ Nowa grafika</button>` : ''}
       <button class="btn primary" data-act="new-post" data-client="${c.id}">＋ Nowa treść</button></div>
-    ${linksBar(c)}
+    ${isClient() ? '' : linksBar(c)}
     <div class="tabs">${tabs.map(([k, l]) => `<a href="#/k/${c.id}/${k}" class="${tab === k ? 'active' : ''}">${l}</a>`).join('')}</div>
     ${content}
   </div>`;
@@ -777,7 +780,7 @@ function viewTable(c) {
       <tbody>${body || `<tr><td colspan="${head.length}"><div class="empty"><b>Brak treści</b>Dodaj treść albo zaimportuj plan z Excela.</div></td></tr>`}</tbody></table>
     </div>
     <div class="row wrap" style="margin-top:12px"><span class="small muted">${ps.length} pozycji · kliknij wiersz, aby edytować · kliknij status publikacji, aby go przełączyć</span><span class="grow"></span>
-      <button class="btn sm" data-act="import-xlsx" data-client="${c.id}">⤒ Import z Excela</button>
+      ${isClient() ? '' : `<button class="btn sm" data-act="import-xlsx" data-client="${c.id}">⤒ Import z Excela</button>`}
       <button class="btn sm" data-act="xlsx" data-id="${c.id}">⤓ Eksport do Excela</button>
       <button class="btn sm ghost" data-act="xlsx-blank" data-id="${c.id}" title="Pusty plan w tym samym układzie (FB + IG, LinkedIn, Opis filarów) – do wypełnienia i zaimportowania">⤓ Pusty szablon</button></div>
     ${ui.month !== 'all' ? `<div class="card notes-card" style="margin-top:16px"><div class="card-h"><h3>Uwagi operacyjne i do potwierdzenia</h3><span class="small muted">· ${monthLabel(ui.month).toLowerCase()} · widoczne dla klienta</span></div>
@@ -863,8 +866,8 @@ function viewProfile(c) {
         <label class="row small muted" style="gap:6px">Kolor <input type="color" data-cfield="color" value="${esc(c.color)}" style="width:34px;height:26px;border:0;padding:0;background:none"></label></div></div>
       ${f('name', 'Nazwa klienta')}
       ${f('contact', 'Osoba kontaktowa / akceptująca', 'np. Anna Nowak – marketing')}
-      ${brandField(c)}
-      ${f('notes', 'Notatki wewnętrzne', 'Wytyczne, zakazy, ustalenia…', 'textarea')}
+      ${isClient() ? '' : brandField(c)}
+      ${isClient() ? '' : f('notes', 'Notatki wewnętrzne', 'Wytyczne, zakazy, ustalenia…', 'textarea')}
     </div></div>
     <div class="card"><div class="card-h"><h3>Profile w social media</h3></div><div class="card-b">
       <div class="prof-head"><span class="ch">${ICON.ig}${ICON.fb}</span><b>Instagram + Facebook</b><span class="small muted">· wspólny opis</span></div>
@@ -873,16 +876,16 @@ function viewProfile(c) {
       <div class="two">${f('liName', 'Nazwa strony / profilu')}${f('liFollowers', 'Obserwujący (do podglądu)', 'np. 4 812')}</div>
       ${f('freq', 'Zasady i częstotliwość publikacji', 'np. dni robocze, 4 posty tygodniowo FB + IG', 'textarea')}
     </div></div>
-    ${linksCard(c)}
+    ${isClient() ? '' : linksCard(c)}
     <div class="card" style="grid-column:1/-1"><div class="card-h"><h3>Strategia</h3><span class="grow"></span>${aiUi('data-ai="strategy-pdf"', 'Wczytaj strategię z PDF', 'btn sm')}</div><div class="card-b">
       <div class="two">${f('tone', 'Ton komunikacji', 'np. bez długich myślników i list, emoji z umiarem', 'textarea')}<div>${f('audience', 'Grupa docelowa')}${f('hashtags', 'Stałe hashtagi', '#marka #branża')}</div></div>
       ${f('strategy', 'Jak filary współgrają', 'np. Filar 1 przyciąga uwagę, Filar 2 pokazuje ofertę, Filar 3 domyka decyzję zaufaniem', 'textarea')}
-      <div class="field"><label>Pełna strategia dla AI <span class="hint">· klient tego nie widzi</span></label>
-        <textarea class="input" data-cfield="strategyDoc" rows="8" placeholder="Cele, pozycjonowanie, oferta, kluczowe komunikaty, zakazy… Wklej strategię albo wczytaj ją z PDF – asystent AI opiera na niej plan i treści.">${esc(c.strategyDoc)}</textarea></div>
+      ${isClient() ? '' : `<div class="field"><label>Pełna strategia dla AI <span class="hint">· klient tego nie widzi</span></label>
+        <textarea class="input" data-cfield="strategyDoc" rows="8" placeholder="Cele, pozycjonowanie, oferta, kluczowe komunikaty, zakazy… Wklej strategię albo wczytaj ją z PDF – asystent AI opiera na niej plan i treści.">${esc(c.strategyDoc)}</textarea></div>`}
     </div></div>
     <div class="card" style="grid-column:1/-1"><div class="card-h"><h3>Filary komunikacji</h3><span class="small muted">· podpowiadane w edytorze, kolor widać w planie i kalendarzu</span><span class="grow"></span><button class="btn sm" data-act="pl-add">＋ Dodaj filar</button></div>
       <div class="card-b">${pillars || '<div class="small muted">Brak filarów. Dodaj je ręcznie albo zaimportuj z arkusza „Opis filarów”.</div>'}
-      <div class="row" style="margin-top:10px"><span class="small muted">Zmiany zapisują się automatycznie.</span><span class="grow"></span><button class="btn sm bad" data-act="del-client" data-id="${c.id}">Usuń klienta</button></div></div></div>
+      <div class="row" style="margin-top:10px"><span class="small muted">Zmiany zapisują się automatycznie.</span><span class="grow"></span>${isClient() ? '' : `<button class="btn sm bad" data-act="del-client" data-id="${c.id}">Usuń klienta</button>`}</div></div></div>
   </div>`;
 }
 
@@ -1270,7 +1273,7 @@ function renderDrawer() {
             ${d.published ? `<input type="date" class="input" data-f="publishedAt" value="${esc(d.publishedAt)}" title="Faktyczna data publikacji">` : ''}</div>
             ${d.published ? `<div class="small muted" style="margin-top:4px">Plan: ${esc(planLabel(d))}${pubShift(d) ? ` · <b style="color:#92400e">opublikowano ${esc(pubShift(d))}</b>` : ''}</div>` : ''}</div>
         </div>
-        <div class="field"><label>Notatka wewnętrzna <span class="hint">· klient jej nie widzi</span></label><textarea class="input" data-f="note" rows="2" style="min-height:48px">${esc(d.note)}</textarea></div>
+        ${isClient() ? '' : `<div class="field"><label>Notatka wewnętrzna <span class="hint">· klient jej nie widzi</span></label><textarea class="input" data-f="note" rows="2" style="min-height:48px">${esc(d.note)}</textarea></div>`}
 
         <div class="sec">Komentarze i uwagi klienta</div>
         ${commentsHtml(d.comments)}
@@ -2288,17 +2291,19 @@ setInterval(() => { if (document.visibilityState === 'visible') pollNotifs(); },
 async function openTeam() {
   let users;
   try { users = await api('GET', '/api/users'); } catch (e) { return toast(e.message, 5000); }
-  modal(`<div class="modal-h"><h2 style="font-size:18px">Zespół</h2><div class="small muted" style="margin-top:4px">Konta osób z agencji. Klienci nie potrzebują kont – dostają link do swojego planu.</div></div>
+  const kl = id => clientById(id)?.name || 'usunięty klient';
+  modal(`<div class="modal-h"><h2 style="font-size:18px">Zespół i konta klientów</h2><div class="small muted" style="margin-top:4px">Konta osób z agencji oraz konta klientów. Konto klienta loguje się w tym panelu i widzi tylko swoją firmę: plan, kalendarz, profil i Grafiki – bez notatek wewnętrznych, linków zespołu i asystenta AI. Klient może też korzystać z samego linku do planu, bez konta.</div></div>
     <div class="modal-b">
       <div class="team">${users.map(u => `<div class="team-row ${u.active ? '' : 'off'}">
         <span class="av" style="width:30px;height:30px;font-size:12px;background:${u.active ? '#4f46e5' : '#9ca3af'}">${esc(initials(u.name))}</span>
-        <div class="grow" style="min-width:0"><div style="font-weight:600">${esc(u.name)} ${u.role === 'admin' ? '<span class="badge s-pub">admin</span>' : ''} ${u.active ? '' : '<span class="badge s-draft">wyłączone</span>'}</div><div class="small muted">${esc(u.email)}</div></div>
+        <div class="grow" style="min-width:0"><div style="font-weight:600">${esc(u.name)} ${u.role === 'admin' ? '<span class="badge s-pub">admin</span>' : ''}${u.role === 'client' ? `<span class="badge s-pending">klient: ${esc(kl(u.clientId))}</span>` : ''} ${u.active ? '' : '<span class="badge s-draft">wyłączone</span>'}</div><div class="small muted">${esc(u.email)}</div></div>
         ${u.id === me.id ? '<span class="small muted">to Ty</span>' : `<button class="btn sm" data-act="user-reset" data-id="${u.id}">Nowe hasło</button>
           <button class="btn sm ${u.active ? 'bad' : ''}" data-act="user-toggle" data-id="${u.id}">${u.active ? 'Wyłącz' : 'Włącz'}</button>`}</div>`).join('')}</div>
       <div class="sec" style="margin-top:18px">Dodaj osobę</div>
       <div class="two"><div class="field"><label>Imię i nazwisko</label><input class="input" id="nuName"></div><div class="field"><label>E-mail</label><input class="input" id="nuEmail" type="email"></div></div>
       <div class="two"><div class="field"><label>Hasło startowe <span class="hint">min. 8 znaków – przekaż je tej osobie</span></label><input class="input" id="nuPass" value="${esc(randomPassword())}"></div>
-        <div class="field"><label>Rola</label><select class="select" id="nuRole"><option value="member">Członek zespołu</option><option value="admin">Administrator (zarządza zespołem)</option></select></div></div>
+        <div class="field"><label>Rola</label><select class="select" id="nuRole"><option value="member">Członek zespołu</option><option value="admin">Administrator (zarządza zespołem)</option><option value="client">Konto klienta (widzi tylko swoją firmę)</option></select></div></div>
+      <div class="field" id="nuClientF" hidden><label>Klient <span class="hint">· to konto zobaczy tylko tego klienta</span></label><select class="select" id="nuClient">${state.clients.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></div>
     </div>
     <div class="modal-f"><button class="btn" data-act="close-modal">Zamknij</button><button class="btn primary" data-act="user-add">Dodaj osobę</button></div>`);
 }
@@ -2308,8 +2313,9 @@ function randomPassword() {
 }
 async function addUser() {
   const body = { name: $('#nuName').value.trim(), email: $('#nuEmail').value.trim(), password: $('#nuPass').value, role: $('#nuRole').value };
+  if (body.role === 'client') body.clientId = $('#nuClient').value;
   if (!body.email) { $('#nuEmail').focus(); return; }
-  try { await api('POST', '/api/users', body); toast(`Dodano ${body.name || body.email}. Przekaż tej osobie e-mail i hasło startowe.`, 5000); openTeam(); }
+  try { await api('POST', '/api/users', body); toast(`Dodano ${body.name || body.email}. Przekaż tej osobie adres ${location.host}, e-mail i hasło startowe.`, 6000); openTeam(); }
   catch (e) { toast(e.message, 5000); }
 }
 async function toggleUser(id) {
@@ -2343,3 +2349,5 @@ async function savePassword() {
     $('#app').innerHTML = `<div class="portal"><div class="card"><div class="empty"><b>${PORTAL_TOKEN ? 'Nie udało się otworzyć planu' : 'Nie udało się wczytać danych'}</b>${esc(e.message)}</div></div></div>`;
   }
 })();
+// rola „Konto klienta” w oknie Zespół: wybór klienta, którego to konto zobaczy
+document.addEventListener('change', e => { if (e.target.id === 'nuRole') $('#nuClientF').hidden = e.target.value !== 'client'; });
